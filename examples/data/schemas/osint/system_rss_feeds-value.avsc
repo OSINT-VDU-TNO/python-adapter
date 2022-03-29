@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "RSSFeeds",
+  "namespace": "osint",
+  "doc": "Message with a RSS URL and and RSS entry.",
+  "fields": [
+    {
+      "name": "url",
+      "type": "string",
+      "doc":
+        "The RSS URL"
+    },
+    {
+      "name": "entry",
+      "type": "string"
+      "doc": "An RSS entry"
+    }
+  ]
+}
