@@ -21,7 +21,7 @@ class ProducerExample:
             "client_id": 'RSS FEED PRODUCER',
             "heartbeat_interval": 10,
             "produce": [schema_topic],
-            "consume": 'system_rss_urls',
+            "consume": ['system_rss_urls'],
             "schema_folder": '../data/schemas'
         }
 
@@ -33,17 +33,17 @@ class ProducerExample:
         # Func when we receive system_rss_urls message
         handle_system_rss_urls_message = lambda message: handle_sys_rss_msg(message, test_bed_adapter, schema_topic)
 
-        # Here we add the message to the test bed adapter
+        # Here we add the handler to the test bed adapter for on_sent
         test_bed_adapter.on_sent += message_sent_handler
 
         test_bed_adapter.initialize()
 
-        # Add a handler to the test bed adapter only for input messages on standard_cap topic
+        # Add a handler to the test bed adapter only for input messages on system_rss_urls topic
         test_bed_adapter.consumer_managers["system_rss_urls"].on_message += handle_system_rss_urls_message
 
-        # Create a new thread that listens to standard_cap topic on the background
-        standard_cap_listener_thread_ = threading.Thread(target=test_bed_adapter.consumer_managers["system_rss_urls"].listen_messages)
-        standard_cap_listener_thread_.start()
+        # Create a new thread that listens to system_rss_urls topic on the background
+        system_rss_urls_listener_thread_ = threading.Thread(target=test_bed_adapter.consumer_managers["system_rss_urls"].listen_messages)
+        system_rss_urls_listener_thread_.start()
 
         # wait for some time
         time.sleep(60)
@@ -52,15 +52,16 @@ class ProducerExample:
         test_bed_adapter.stop()
 
         # Clean after ourselves
-        standard_cap_listener_thread_.join()
+        system_rss_urls_listener_thread_.join()
 
 def handle_sys_rss_msg(message, test_bed_adapter, schema_topic):
     messages = []
-    for url in message.urls:
-        NewsFeed = feedparser.parse(url)
-        entry = NewsFeed.entries[1]
-        messages.append({url: url, entry: json.dumps(entry)})
-    
+    for msg in message['decoded_value']:
+        for url in msg['urls']:
+            NewsFeed = feedparser.parse(url)
+            entry = NewsFeed.entries[1]
+            messages.append({'url': url, 'entry': json.dumps(entry)})
+
     test_bed_adapter.producer_managers[schema_topic].send_messages(messages)
 
 if __name__ == '__main__':

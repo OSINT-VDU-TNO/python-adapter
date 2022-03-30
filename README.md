@@ -1,9 +1,7 @@
 # python-test-bed-adapter
 
 This is the test-bed adapter for Python: it allows you to easily connect Python 
-services to the Apache Kafka test-bed via Python. Although it is specifically 
-created for connecting to our [test-bed](https://github.com/DRIVER-EU/test-bed), 
-it should work for any Apache Kafka version too.
+services to the Apache Kafka test-bed via Python. 
 
 The implementation is a wrapper around [Pykafka](https://github.com/Parsely/pykafka) 
 and [avro-python3](https://avro.apache.org/docs/1.8.2/gettingstartedpython.html) 
@@ -21,16 +19,11 @@ as explained [here](https://github.com/DRIVER-EU/avro-schemas).
 ## Installation
 You need to install [Python 3+](https://www.python.org/). 
 
-To install the [PYPI](https://pypi.org/project/osint-python-test-bed-adapter/) package run
- ```pip3 install osint-python-test-bed-adapter```
-
-### Using the Github repo
-If you clone the Github repository, to run the examples you will need to install the dependencies
-specified on the file 
-[requirements.txt](https://github.com/DRIVER-EU/python-test-bed-adapter/blob/master/requirements.txt)
- For that, run
- ```pip3 install -r requirements.txt```
- from the project folder.
- ## Examples and usage
- Check the examples of [consumer](https://github.com/DRIVER-EU/python-test-bed-adapter/blob/master/examples/consumer_example.py)
- and [producer](https://github.com/DRIVER-EU/python-test-bed-adapter/blob/master/examples/producer_example.py).
+To run the examples you will need to install the dependencies specified on the file[requirements.txt](https://github.com/DRIVER-EU/python-test-bed-adapter/blob/master/requirements.txt)
+For that, run
+```pip3 install -r requirements.txt```
+from the project folder.
+## Examples and usage
+- url_producer: creates a message with 4 URLs to RSS feeds on the topic ('system_rss_urls')
+- rss_producer: listens to url messages ('system_rss_urls') and produces RSS messages ('system_rss_urls')
+- rss_consumer: listens to RSS messages ('system_rss_urls') and prints them to console.
