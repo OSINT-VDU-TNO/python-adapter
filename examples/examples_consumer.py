@@ -11,14 +11,12 @@ class ConsumerExample:
     @staticmethod
     def main():
         options = {
-          "auto_register_schemas": True,
           "kafka_host": '127.0.0.1:3501',
           "schema_registry": 'http://localhost:3502',
           "fetch_all_versions": False,
           "from_off_set": True,
-          "client_id": 'RSS READER',
-          "consume": ["article_raw_xx", "config", "feed_item_xx", "metadata_item", "source_item"],
-          "schema_folder": '../data/schemas'
+          "client_id": 'EXAMPLES CONSUMER',
+          "consume": ["article_raw_xx", "config", "feed_item_xx", "metadata_item", "source_item"]
           }
 
         test_bed_adapter = TestBedAdapter(TestBedOptions(options))
