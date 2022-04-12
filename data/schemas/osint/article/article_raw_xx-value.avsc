@@ -1,0 +1,92 @@
+{
+  "name": "ArticleItem",
+  "type": "record",
+  "namespace": "osint",
+  "doc": "An Unknown Language article",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string",
+      "doc": "The article id"
+    },
+    {
+      "name": "feedId",
+      "type": "string",
+      "doc": "The feed id"
+    },
+    {
+      "name": "sourceId",
+      "type": "string",
+      "doc": "The source id"
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "doc": "The feed type (RSS)"
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "doc": "The feed URL"
+    },
+    {
+      "name": "text",
+      "type": "string",
+      "doc": "The raw article"
+    },
+    {
+      "name": "language",
+      "type": "string",
+      "doc": "The language of this article"
+    },
+    {
+      "name": "html",
+      "type": ["null", "string"],
+      "doc": "The raw html",
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": [
+        "null",
+        {
+          "name": "metadataItems",
+          "type": "array",
+          "doc": "Array of metadata items",
+          "items": {
+            "name": "metadataItem",
+            "type": "record",
+            "doc": "A Metadata item",
+            "fields": [
+              {
+                "name": "origin",
+                "type": "string",
+                "doc": "The originating service of this metadata item"
+              },
+              {
+                "name": "data",
+                "doc": "A map of string/string pairs",
+                "type": {
+                  "type": "map",
+                  "values": "string"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "doc": "The metadata, either null or a metadata item",
+      "default": null
+    },
+    {
+      "name": "created",
+      "type": "long",
+      "doc": "Created at"
+    },
+    {
+      "name": "updated",
+      "type": "long",
+      "doc": "Updated at"
+    }
+  ]
+}

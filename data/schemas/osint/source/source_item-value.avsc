@@ -1,0 +1,84 @@
+{
+  "type": "record",
+  "name": "SourceItem",
+  "namespace": "osint",
+  "doc": "Message that represents one source and its feeds.",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string",
+      "doc": "The source id"
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "doc": "The source name"
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "doc": "The source URL"
+    },
+    {
+      "name": "feeds",
+      "doc": "A list of feeds for this source",
+      "type": {
+        "type": "array",
+        "items": {
+          "name": "feed",
+          "type": "record",
+          "doc": "A feed",
+          "fields": [
+            {
+              "name": "id",
+              "type": "string",
+              "doc": "The feed id"
+            },
+            {
+              "name": "sourceId",
+              "type": "string",
+              "doc": "The source id"
+            },
+            {
+              "name": "language",
+              "type": "string",
+              "doc": "The feed language 2 letter ISO code"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "doc": "The feed name"
+            },
+            {
+              "name": "type",
+              "type": "string",
+              "doc": "The feed type (RSS/Twitter/GDELT/...)"
+            },
+            {
+              "name": "url",
+              "type": "string",
+              "doc": "The feed URL"
+            },
+            {
+              "name": "refresh",
+              "type": "string",
+              "doc": "The refresh interval for this feed in seconds"
+            },
+            {
+              "name": "options",
+              "doc": "An optional map of string/string pairs",
+              "type": [
+                "null",
+                {
+                  "type": "map",
+                  "values": "string"
+                }
+              ],
+              "default": null
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

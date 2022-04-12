@@ -1,0 +1,21 @@
+{
+  "name": "metadataItem",
+  "type": "record",
+  "namespace": "osint",
+  "doc": "A Metadata item",
+  "fields": [
+    {
+      "name": "origin",
+      "type": "string",
+      "doc": "The originating service of this metadata item"
+    },
+    {
+      "name": "data",
+      "doc": "A map of string/string pairs",
+      "type": {
+        "type": "map",
+        "values": "string"
+      }
+    }
+  ]
+}

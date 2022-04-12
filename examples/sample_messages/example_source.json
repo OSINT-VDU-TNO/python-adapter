@@ -1,0 +1,20 @@
+{
+  "id": "eeb7c033-b821-40c1-a6c7-8f9db654ee0a",
+  "name": "TASS",
+  "url": "https://tass.com/",
+  "feeds": [
+    {
+      "id": "7f95f69f-9f5a-49a2-8d25-158cc31eefde",
+      "sourceId": "eeb7c033-b821-40c1-a6c7-8f9db654ee0a",
+      "language": "en",
+      "name": "TASS",
+      "type": "RSS",
+      "url": "http://tass.com/rss/v2.xml",
+      "refresh": "5 * * * *",
+      "options": {
+        "opt1": "test1",
+        "opt2": "test2"
+      }
+    }
+  ]
+}

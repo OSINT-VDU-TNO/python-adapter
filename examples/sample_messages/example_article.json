@@ -1,0 +1,21 @@
+{
+  "id": "613a1bdd-4ad9-4260-8504-5bc000a897c1",
+  "feedId": "7f95f69f-9f5a-49a2-8d25-158cc31eefde",
+  "sourceId": "eeb7c033-b821-40c1-a6c7-8f9db654ee0a",
+  "type": "RSS",
+  "url": "https://tass.com/politics/1436653",
+  "text": "Some article test text",
+  "language": "en",
+  "html": "<h> Hello </h>",
+  "metadata": [
+    {
+      "origin": "NER",
+      "data": {
+        "testEntity1": "0,0,1",
+        "testEntity2": "1,5,1"
+      }
+    }
+  ],
+  "created": 1649788962922,
+  "updated": 1649788962922
+}

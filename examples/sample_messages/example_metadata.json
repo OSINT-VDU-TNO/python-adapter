@@ -1,0 +1,7 @@
+{
+  "origin": "NER",
+  "data": {
+    "testEntity1": "0,0,1",
+    "testEntity2": "1,5,1"
+  }
+}
