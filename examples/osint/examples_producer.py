@@ -1,12 +1,13 @@
+import json
+from test_bed_adapter import TestBedAdapter
+from test_bed_adapter.options.test_bed_options import TestBedOptions
 import sys
 import logging
 import os
 import time
 logging.basicConfig(level=logging.INFO)
 sys.path += [".."]
-from test_bed_adapter.options.test_bed_options import TestBedOptions
-from test_bed_adapter import TestBedAdapter
-import json
+
 
 class ProducerExample:
     @staticmethod
@@ -23,7 +24,8 @@ class ProducerExample:
         test_bed_adapter = TestBedAdapter(TestBedOptions(options))
 
         # This funcion will act as a handler. It only prints the message once it has been sent
-        message_sent_handler = lambda message : logging.info("\n\n------\nmessage sent:\n------\n\n" + str(message))
+        def message_sent_handler(message): return logging.info(
+            "\n\n------\nmessage sent:\n------\n\n" + str(message))
 
         # Here we add the handler to the test bed adapter for on_sent
         test_bed_adapter.on_sent += message_sent_handler
@@ -41,17 +43,23 @@ class ProducerExample:
 
         test_bed_adapter.initialize()
 
-        test_bed_adapter.producer_managers["article_raw_xx"].send_messages(messages1)
+        test_bed_adapter.producer_managers["article_raw_xx"].send_messages(
+            messages1)
         test_bed_adapter.producer_managers["config"].send_messages(messages2)
-        test_bed_adapter.producer_managers["feed_item_xx"].send_messages(messages3)
-        test_bed_adapter.producer_managers["metadata_item"].send_messages(messages4)
-        test_bed_adapter.producer_managers["source_item"].send_messages(messages5)
+        test_bed_adapter.producer_managers["feed_item_xx"].send_messages(
+            messages3)
+        test_bed_adapter.producer_managers["metadata_item"].send_messages(
+            messages4)
+        test_bed_adapter.producer_managers["source_item"].send_messages(
+            messages5)
 
-        # wait for some time
-        time.sleep(60)
+        try:
+            # wait for some time
+            time.sleep(60)
+        finally:
+            # Stop test bed
+            test_bed_adapter.stop()
 
-        # Stop test bed
-        test_bed_adapter.stop()
 
 def parse_json_file(file_name):
     message_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -61,6 +69,7 @@ def parse_json_file(file_name):
     body = json.loads(example_message_file.read())
     example_message_file.close()
     return body
+
 
 if __name__ == '__main__':
     ProducerExample().main()

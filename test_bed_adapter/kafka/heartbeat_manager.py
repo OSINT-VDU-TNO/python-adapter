@@ -13,9 +13,10 @@ class HeartbeatManager:
         self.client_id = client_id
         self.kafka_heartbeat_producer = kafka_heartbeat_producer
         self.helper = Helpers()
+        self.interval_thread = {}
 
     def start_heartbeat_async(self):
-        self.helper.set_interval(self.send_heartbeat_message, self.heartbeat_interval)
+        self.interval_thread = self.helper.set_interval(self.send_heartbeat_message, self.heartbeat_interval)
 
     def send_heartbeat_message(self):
         date = datetime.datetime.utcnow()
@@ -27,7 +28,7 @@ class HeartbeatManager:
         try:
             externalIP = str(urllib.request.urlopen("http://ipv4bot.whatismyipaddress.com").read().decode("utf-8"))
         except urllib.error.URLError as e:
-            externalIP = "unkown"
+            externalIP = "unknown"
 
         message_json = {"id": self.client_id, "alive": date_ms,
                         "origin": "{hostname: %s, localIP: %s, externalIP: %s}" % (hostName, hostIP, externalIP)}
@@ -36,4 +37,4 @@ class HeartbeatManager:
         self.kafka_heartbeat_producer.send_messages(messages)
 
     def stop(self):
-        self.helper.stop_set_interval_thread()
+        self.interval_thread()

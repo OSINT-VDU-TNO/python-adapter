@@ -34,16 +34,18 @@ class ConsumerExample:
 
         # Create a new thread that listens to the CAP topic on the background
         system_cap_listener_thread_ = threading.Thread(
-            target=test_bed_adapter.consumer_managers["standard_cap"].listen_messages).start()
+            target=test_bed_adapter.consumer_managers["standard_cap"].listen_messages)
+        system_cap_listener_thread_.start()
 
-        # wait for some time
-        time.sleep(60)
+        try:
+            # wait for some time
+            time.sleep(60)
+        finally:
+            # Stop test bed
+            test_bed_adapter.stop()
 
-        # Stop test bed
-        test_bed_adapter.stop()
-
-        # Clean after ourselves
-        system_cap_listener_thread_.join()
+            # Clean after ourselves
+            system_cap_listener_thread_.join()
 
 
 if __name__ == '__main__':

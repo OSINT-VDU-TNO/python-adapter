@@ -41,7 +41,7 @@ class ConsumerManager(KafkaManager):
 
         # We do not throw the exception if it occurs because we have externally closed the simple consumer
         except ConsumerStoppedException as e:
-            logging.warning("kafka consumer for topic " + str(self.topic) + "was stoped")
+            logging.warning("kafka consumer for topic " + str(self.topic) + "was stopped")
 
     # Listen to the last messages (specifying number) with the specified options
     def listen_last_messages(self, messages_number):
@@ -60,7 +60,7 @@ class ConsumerManager(KafkaManager):
 
         # We do not throw the exception if it occurs because we have externally closed the simple consumer
         except ConsumerStoppedException as e:
-            logging.warning("kafka consumer for topic " + str(self.topic) + "was stoped")
+            logging.warning("kafka consumer for topic " + str(self.topic) + "was stopped")
 
     # We decode and pass the message to the handler
     def decode_and_fire(self, message):

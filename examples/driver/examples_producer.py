@@ -38,11 +38,12 @@ class ProducerExample:
         test_bed_adapter.producer_managers["standard_cap"].send_messages(
             messages1)
 
-        # wait for some time
-        time.sleep(60)
-
-        # Stop test bed
-        test_bed_adapter.stop()
+        try:
+            # wait for some time
+            time.sleep(60)
+        finally:
+            # Stop test bed
+            test_bed_adapter.stop()
 
 
 def parse_json_file(file_name):
