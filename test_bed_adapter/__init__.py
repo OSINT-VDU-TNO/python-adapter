@@ -17,7 +17,7 @@ class TestBedAdapter:
         self.schema_registry = SchemaRegistry(test_bed_options)
         self.schema_publisher = SchemaPublisher(test_bed_options)
         self.default_producer_topics = ["system_heartbeat"]
-        self.default_consumer_topics = ["system_timing"]
+        self.default_consumer_topics = ["simulation_time_mgmt"]
         self.consumer_managers = {}
         self.producer_managers = {}
         self.connected = False
@@ -52,7 +52,8 @@ class TestBedAdapter:
 
     def init_consumers(self):
         # Make sure default topics are considered, avoid duplicates
-        self.test_bed_options.consume = list(set(self.test_bed_options.consume + self.default_consumer_topics))
+        self.test_bed_options.consume = list(
+            set(self.test_bed_options.consume + self.default_consumer_topics))
 
         # Instantiate one consumer manager for each topic
         for topic_name in self.test_bed_options.consume:
@@ -73,13 +74,15 @@ class TestBedAdapter:
                                           self.handle_message,
                                           self.ssl_config)
                 self.consumer_managers[topic_name] = manager
-                logging.info("Initialized kafka consumer manager for topic " + topic_name)
+                logging.info(
+                    "Initialized kafka consumer manager for topic " + topic_name)
             else:
                 logging.error("No schema found for topic " + topic_name)
 
     def init_producers(self):
         # Make sure default topics are considered, avoid duplicates
-        self.test_bed_options.produce = list(set(self.test_bed_options.produce + self.default_producer_topics))
+        self.test_bed_options.produce = list(
+            set(self.test_bed_options.produce + self.default_producer_topics))
 
         # Instantiate one producer manager for each topic
         for topic_name in self.test_bed_options.produce:
@@ -96,15 +99,18 @@ class TestBedAdapter:
                                           avro_helper_key, avro_helper_value,
                                           self.successfully_sent_message, self.ssl_config)
                 self.producer_managers[topic_name] = manager
-                logging.info("Initialized kafka producer manager for topic" + topic_name)
+                logging.info(
+                    "Initialized kafka producer manager for topic" + topic_name)
             else:
                 logging.error("No schema found for topic " + topic_name)
 
     def init_services(self):
-        if "system_timing" not in self.consumer_managers.keys():
-            logging.error("TimeService could not be initialized, No schema found for topic system_timing")
+        if "simulation_time_mgmt" not in self.consumer_managers.keys():
+            logging.error(
+                "TimeService could not be initialized, No schema found for topic simulation_time_mgmt")
         else:
-            self.time_service = TimeService(self.consumer_managers["system_timing"])
+            self.time_service = TimeService(
+                self.consumer_managers["simulation_time_mgmt"])
 
     def init_and_start_heartbeat(self):
         if "system_heartbeat" in self.producer_managers.keys():
@@ -113,7 +119,8 @@ class TestBedAdapter:
                                                       self.test_bed_options.client_id)
             self.heartbeat_manager.start_heartbeat_async()
         else:
-            logging.error("Heartbeat could not be initialized, No schema found for topic system_heartbeat")
+            logging.error(
+                "Heartbeat could not be initialized, No schema found for topic system_heartbeat")
 
     def stop(self):
         # Stop the heartbeat thread
