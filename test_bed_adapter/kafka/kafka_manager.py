@@ -16,5 +16,5 @@ class KafkaManager():
 
         # we set up the Kafka client and kafka client topics to obtain consumers and producers from them in the classes
         # that will inherit from this
-        self.client = KafkaClient(hosts=self.kafka_host, exclude_internal_topics=self.exclude_internal_topics, ssl_config=self.ssl_config)
+        self.client = KafkaClient(hosts=self.kafka_host, exclude_internal_topics=self.exclude_internal_topics, ssl_config=self.ssl_config, broker_version='3.1.0')
         self.client_topic = self.client.topics[kafka_topic]

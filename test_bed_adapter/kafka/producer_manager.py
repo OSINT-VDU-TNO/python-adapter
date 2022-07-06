@@ -28,8 +28,10 @@ class ProducerManager(KafkaManager):
 
     def send_messages(self, messages: list):
         for m in messages:
+            date = datetime.datetime.utcnow()
+            date_ms = int(time.mktime(date.timetuple())) * 1000
             encoded_key, encoded_message = self._avro_encode(m)
-            self.producer.produce(encoded_message, encoded_key)
+            self.producer.produce(encoded_message, encoded_key, timestamp=date_ms)
             # We fire the handler to signify that the message was sent OK
             self.on_sent.fire(m)
 
