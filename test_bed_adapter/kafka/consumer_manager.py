@@ -21,7 +21,7 @@ class ConsumerManager(KafkaManager):
 
         # We create the simple consumer with the options
         self.simple_consumer = self.client_topic.get_simple_consumer(auto_commit_enable=True,
-                                                                     auto_commit_interval_ms=10,
+                                                                     auto_commit_interval_ms=10000,
                                                                      reset_offset_on_start=self.reset_offset_on_start,
                                                                      auto_offset_reset=self.auto_offset_reset,
                                                                      consumer_id=self.consumer_group,
