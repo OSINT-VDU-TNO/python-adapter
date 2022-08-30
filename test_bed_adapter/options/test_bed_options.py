@@ -1,8 +1,7 @@
 class TestBedOptions:
     def __init__(self, dictionary):
-        # clientId, kafkaHost, schemaRegistry)
-        # Unique ID of this client
-        self.client_id = None
+        # Group ID that this adapter should join
+        self.consumer_group = None
 
         # Uri for the Kafka broker, e.g. broker:3501
         self.kafka_host = None
@@ -10,60 +9,76 @@ class TestBedOptions:
         # Uri for the schema registry, e.g. schema_registry:3502
         self.schema_registry = "localhost:3502"
 
+        # Max message bytes
+        self.message_max_bytes = 1000000
+
+        # Partitioner type for producer. Values: random, consistent, consistent_random, murmur2, murmur2_random, fnv1a, fnv1a_random
+        self.partitioner = 'random'
+
         # If true, automatically register schema's on startup
-        self.auto_register_schemas = False
+        # Not implemented
+        #self.auto_register_schemas = False
 
         # If autoRegisterSchemas is true, contains the folder with *.avsc schema's to register
-        self.schema_folder = "data/schemas/"
+        # NOt implemented
+        #self.schema_folder = "data/schemas/"
 
         # If true fetch all schema versions (and not only the latest)
-        self.fetch_all_versions = False
+        # Not implemented
+        #self.fetch_all_versions = False
 
         # If true fetch all schema's (and not only the consume and produce topics)
-        self.fetch_all_schemas = False
+        # Not implemented
+        #self.fetch_all_schemas = False
 
         # If true fetch all schema's (and not only the consume and produce topics)
-        self.fetch_all_topics = False
+        # Not implemented
+        #self.fetch_all_topics = False
 
         # If set true, use the topics offset to retreive messages
-        self.exclude_internal_topics = False
+        # Not implemented
+        #self.exclude_internal_topics = False
 
         # Reset the offset messages on start.
-        self.reset_offset_on_start = False
+        # Not implemented
+        #self.reset_offset_on_start = False
 
-        # Offset type possibles: LATEST, EARLIEST
-        self.offset_type = "EARLIEST"
+        # Offset type possibles: earliest, latest, error
+        self.offset_type = "earliest"
 
         # How often should the adapter try to reconnect to the kafka server if the first time fails
-        self.reconnection_retries = 5
+        # Not implemented
+        # self.reconnection_retries = 5
 
         # Interval between two heartbeat messages in secs
         self.heartbeat_interval = 10
 
         # Send messages asynchronously
-        self.send_messages_asynchronously = True
+        # Send is async by default
+        #self.send_messages_asynchronously = True
 
         # Topics you want to consume
-        self.consume = []
+        # Not implemented
+        #self.consume = []
 
         # Topics you want to produce
-        self.produce = []
+        # Not implemented
+        #self.produce = []
 
         # If set true, use SSL
-        self.use_ssl = False
+        #self.use_ssl = False
 
         # Path to trusted CA certificate. It will only be used if use_ssl is set true.
-        self.ca_file = ""
+        #self.ca_file = ""
 
         # Path to client certificate. It will only be used if use_ssl is set true.
-        self.cert_file: str = None
+        #self.cert_file: str = None
 
         # Path to client private-key file. It will only be used if use_ssl is set true.
-        self.key_file: str = None
+        #self.key_file: str = None
 
         # Password for private key. It will only be used if use_ssl is set true.
-        self.password_private_key: str = None
-
+        #self.password_private_key: str = None
 
         # Here we override the default values if they were introduced in the dictionary as an input of the constructor
         for key in dictionary:
@@ -74,5 +89,3 @@ class TestBedOptions:
 
     def get_options_from_file(self):
         print("")
-        
-        

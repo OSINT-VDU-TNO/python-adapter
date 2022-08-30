@@ -1,54 +1,50 @@
-from ..utils.event_hook import EventHook
-from .kafka_manager import KafkaManager
-import datetime, time
-import logging
-import uuid
+from confluent_kafka import SerializingProducer
+from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry.avro import AvroSerializer
+from datetime import datetime
+from uuid import uuid4
+import time
+
+from naas_python_kafka.options.test_bed_options import TestBedOptions
 
 
-class ProducerManager(KafkaManager):
-    def __init__(self, kafka_topic, kafka_host, exclude_internal_topics, client_id, send_messages_asynchronously,
-                 avro_helper_key, avro_helper_value, successfully_sent_message, ssl_config):
-        super().__init__(kafka_topic, kafka_host, exclude_internal_topics, avro_helper_key, avro_helper_value, ssl_config)
+class ProducerManager():
+    def __init__(self, options: TestBedOptions, kafka_topic):
+        self.options = options
+        self.kafka_topic = kafka_topic
 
-        self.client_id = client_id
-        self.heartbeat_topic = b"system_heartbeat"
+        schema_registry_conf = {'url': self.options.schema_registry}
+        schema_registry_client = SchemaRegistryClient(schema_registry_conf)
 
-        # The emisor handler will be fired if a message is sent
-        self.on_sent = EventHook()
+        avro_message_serializer = AvroSerializer(
+            schema_registry_client=schema_registry_client, schema_str=schema_registry_client.get_latest_version(str(kafka_topic + '-value')).schema.schema_str)
+        avro_key_serializer = AvroSerializer(
+            schema_registry_client=schema_registry_client, schema_str=schema_registry_client.get_latest_version(str(kafka_topic + '-key')).schema.schema_str)
 
-        if successfully_sent_message and not (kafka_topic == self.heartbeat_topic):
-            self.on_sent += successfully_sent_message
+        producer_conf = {'bootstrap.servers': self.options.kafka_host,
+                         'key.serializer': avro_key_serializer,
+                         'value.serializer': avro_message_serializer,
+                         'partitioner': self.options.partitioner}
 
-        if send_messages_asynchronously:
-            self.producer = self.client_topic.get_producer()
-            logging.info("Messages will be sent asynchronously")
-        else:
-            self.producer = self.client_topic.get_sync_producer()
-            logging.info("Messages will be sent synchronously")
+        self.producer = SerializingProducer(producer_conf)
 
     def send_messages(self, messages: list):
         for m in messages:
-            date = datetime.datetime.utcnow()
+            date = datetime.utcnow()
             date_ms = int(time.mktime(date.timetuple())) * 1000
-            encoded_key, encoded_message = self._avro_encode(m)
-            self.producer.produce(encoded_message, encoded_key, timestamp=date_ms)
-            # We fire the handler to signify that the message was sent OK
-            self.on_sent.fire(m)
+            k = {"distributionID": str(uuid4()), "senderID": self.options.consumer_group,
+                 "dateTimeSent": date_ms, "dateTimeExpires": 0,
+                 "distributionStatus": "Test", "distributionKind": "Unknown"}
+            # Serve on_delivery callbacks from previous calls to produce()
+            self.producer.poll(0.0)
+            try:
+                self.producer.produce(
+                    topic=self.kafka_topic, key=k, value=m, timestamp=date_ms)
+            except ValueError:
+                print("Invalid input, discarding record...")
+                continue
 
-    def _avro_encode(self, message):
-        # Lazy people might just give the message itself as input
-        if "message" not in message:
-            message = {"message": message}
-        # If our message has a key we use it, otherwise we use a default one
-        if "key" not in message:
-            date = datetime.datetime.utcnow()
-            date_ms = int(time.mktime(date.timetuple())) * 1000
-            # For the default key we set a RFC4122 version 4 compliant GUID
-            message["key"] = {"distributionID": str(uuid.uuid4()), "senderID": self.client_id,
-                              "dateTimeSent": date_ms, "dateTimeExpires": 0,
-                              "distributionStatus": "Test", "distributionKind": "Unknown"}
-        return (self.avro_helper_key.avro_encode_messages(message["key"]),
-                self.avro_helper_value.avro_encode_messages(message["message"]))
+            self.producer.flush()
 
     def stop(self):
-        self.producer.stop()
+        self.producer.flush()

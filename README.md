@@ -1,20 +1,16 @@
-# python-test-bed-adapter
+# naas-python-kafka
 
-This is the test-bed adapter for Python: it allows you to easily connect Python 
-services to the Apache Kafka test-bed via Python. 
+This is the kafka adapter for Python: it allows you to easily connect Python 
+services to Apache Kafka via Python. 
 
-The implementation is a wrapper around [Pykafka](https://github.com/Parsely/pykafka) 
-and [avro-python3](https://avro.apache.org/docs/1.8.2/gettingstartedpython.html) 
-offering support for:
+The implementation is a wrapper around [Confluent-kafka-python](https://github.com/confluentinc/confluent-kafka-python) 
 - AVRO schema's and messages: both key's and values should have a schema 
 as explained [here](https://github.com/DRIVER-EU/avro-schemas).
 - Kafka consumer and producer for the test-bed topics.
 - Management
-  - Heartbeat (topic: connect-status-heartbeat), so you know which clients are online.
+  - Heartbeat (topic: system-heartbeat), so you know which clients are online.
   Each time the test-bed-adapter is executed, it starts a heartbeat process to notify
   the its activity to other clients.
-  - Configuration (topic: connect-status-configuration), so you can see which 
-  topics clients consume and produce.
 
 ## Installation
 You need to install [Python 3+](https://www.python.org/). 

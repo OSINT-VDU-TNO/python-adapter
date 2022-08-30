@@ -1,3 +1,4 @@
+from naas_python_kafka.options.test_bed_options import TestBedOptions
 from .producer_manager import ProducerManager
 from ..utils.helpers import Helpers
 
@@ -8,15 +9,18 @@ import time
 
 
 class HeartbeatManager:
-    def __init__(self, kafka_heartbeat_producer: ProducerManager, heartbeat_interval, client_id):
-        self.heartbeat_interval = heartbeat_interval
-        self.client_id = client_id
-        self.kafka_heartbeat_producer = kafka_heartbeat_producer
+    def __init__(self, options: TestBedOptions, kafka_topic):
+        self.options = options
         self.helper = Helpers()
         self.interval_thread = {}
 
+        self.kafka_heartbeat_producer = ProducerManager(
+            options=self.options, kafka_topic=kafka_topic)
+
     def start_heartbeat_async(self):
-        self.interval_thread = self.helper.set_interval(self.send_heartbeat_message, self.heartbeat_interval)
+        print('Heartbeat Started')
+        self.interval_thread = self.helper.set_interval(
+            self.send_heartbeat_message, self.options.heartbeat_interval)
 
     def send_heartbeat_message(self):
         date = datetime.datetime.utcnow()
@@ -26,15 +30,16 @@ class HeartbeatManager:
         hostName = str(socket.gethostname())
         hostIP = str(socket.gethostbyname(hostName))
         try:
-            externalIP = str(urllib.request.urlopen("http://ipv4bot.whatismyipaddress.com").read().decode("utf-8"))
+            externalIP = str(urllib.request.urlopen(
+                "http://ipv4bot.whatismyipaddress.com").read().decode("utf-8"))
         except urllib.error.URLError as e:
             externalIP = "unknown"
 
-        message_json = {"id": self.client_id, "alive": date_ms,
+        message_json = {"id": self.options.consumer_group, "alive": date_ms,
                         "origin": "{hostname: %s, localIP: %s, externalIP: %s}" % (hostName, hostIP, externalIP)}
 
-        messages = [{"message": message_json}]
-        self.kafka_heartbeat_producer.send_messages(messages)
+        messages = [message_json]
+        self.kafka_heartbeat_producer.send_messages(messages=messages)
 
     def stop(self):
         self.interval_thread()

@@ -1,5 +1,5 @@
-from test_bed_adapter import TestBedAdapter
-from test_bed_adapter.options.test_bed_options import TestBedOptions
+from naas_python_kafka import (TestBedAdapter, TestBedOptions)
+from naas_python_kafka.kafka.consumer_manager import ConsumerManager
 import time
 import sys
 import logging
@@ -11,16 +11,18 @@ sys.path += [".."]
 class ConsumerExample:
     @staticmethod
     def main():
-        options = {
+        tb_options = {
+            "consumer_group": 'EXAMPLES CONSUMER',
             "kafka_host": '127.0.0.1:3501',
             "schema_registry": 'http://localhost:3502',
-            "fetch_all_versions": False,
-            "from_off_set": True,
-            "client_id": 'EXAMPLES CONSUMER',
-            "consume": ["article_raw_xx", "config", "feed_item_xx", "metadata_item", "source_item"]
+            "message_max_bytes": 1000000,
+            "partitioner": 'random',
+            "offset_type": 'earliest'
         }
 
-        test_bed_adapter = TestBedAdapter(TestBedOptions(options))
+        TESTBED_OPTIONS = TestBedOptions(tb_options)
+
+        test_bed_adapter = TestBedAdapter(TESTBED_OPTIONS)
 
         # This funcion will act as a handler. It only prints the incoming messages
         def handle_art_message(message): return logging.info(
@@ -41,28 +43,21 @@ class ConsumerExample:
         # We initialize the process (catching schemas and so on) and we listen the messages from the topic system_rss_feeds
         test_bed_adapter.initialize()
 
-        # Add a handler to the test bed adapter only for input messages on system_rss_feeds topic
-        test_bed_adapter.consumer_managers["article_raw_xx"].on_message += handle_art_message
-        test_bed_adapter.consumer_managers["config"].on_message += handle_conf_message
-        test_bed_adapter.consumer_managers["feed_item_xx"].on_message += handle_feed_message
-        test_bed_adapter.consumer_managers["metadata_item"].on_message += handle_metadata_message
-        test_bed_adapter.consumer_managers["source_item"].on_message += handle_source_message
-
         # Create a new thread that listens to system_rss_feeds topic on the background
-        system_art_listener_thread_ = threading.Thread(
-            target=test_bed_adapter.consumer_managers["article_raw_xx"].listen_messages)
+        system_art_listener_thread_ = threading.Thread(target=ConsumerManager(
+            options=TESTBED_OPTIONS, kafka_topic='article_raw_xx',  handle_message=handle_art_message).listen)
         system_art_listener_thread_.start()
-        system_conf_listener_thread_ = threading.Thread(
-            target=test_bed_adapter.consumer_managers["config"].listen_messages)
+        system_conf_listener_thread_ = threading.Thread(target=ConsumerManager(
+            options=TESTBED_OPTIONS, kafka_topic='config', handle_message=handle_conf_message).listen)
         system_conf_listener_thread_.start()
-        system_feed_listener_thread_ = threading.Thread(
-            target=test_bed_adapter.consumer_managers["feed_item_xx"].listen_messages)
+        system_feed_listener_thread_ = threading.Thread(target=ConsumerManager(
+            options=TESTBED_OPTIONS, kafka_topic='feed_item_xx', handle_message=handle_feed_message).listen)
         system_feed_listener_thread_.start()
-        system_metadata_listener_thread_ = threading.Thread(
-            target=test_bed_adapter.consumer_managers["metadata_item"].listen_messages)
+        system_metadata_listener_thread_ = threading.Thread(target=ConsumerManager(
+            options=TESTBED_OPTIONS, kafka_topic='metadata_item', handle_message=handle_metadata_message).listen)
         system_metadata_listener_thread_.start()
-        system_source_listener_thread_ = threading.Thread(
-            target=test_bed_adapter.consumer_managers["source_item"].listen_messages)
+        system_source_listener_thread_ = threading.Thread(target=ConsumerManager(
+            options=TESTBED_OPTIONS, kafka_topic='source_item', handle_message=handle_source_message).listen)
         system_source_listener_thread_.start()
 
         try:
