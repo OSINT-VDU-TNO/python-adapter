@@ -2,7 +2,7 @@ from confluent_kafka import DeserializingConsumer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 
-from naas_python_kafka.options.test_bed_options import TestBedOptions
+from ..options.test_bed_options import TestBedOptions
 
 
 class ConsumerManager():

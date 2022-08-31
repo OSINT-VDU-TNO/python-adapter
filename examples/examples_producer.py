@@ -1,6 +1,6 @@
 import json
-from naas_python_kafka import (TestBedAdapter, TestBedOptions)
-from naas_python_kafka.kafka.producer_manager import ProducerManager
+from test_bed_adapter import (TestBedAdapter, TestBedOptions)
+from test_bed_adapter.kafka.producer_manager import ProducerManager
 import sys
 import logging
 import os

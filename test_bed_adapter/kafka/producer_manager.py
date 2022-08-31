@@ -5,7 +5,7 @@ from datetime import datetime
 from uuid import uuid4
 import time
 
-from naas_python_kafka.options.test_bed_options import TestBedOptions
+from ..options.test_bed_options import TestBedOptions
 
 
 class ProducerManager():

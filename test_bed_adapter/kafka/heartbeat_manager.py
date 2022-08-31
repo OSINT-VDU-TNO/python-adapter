@@ -1,4 +1,4 @@
-from naas_python_kafka.options.test_bed_options import TestBedOptions
+from ..options.test_bed_options import TestBedOptions
 from .producer_manager import ProducerManager
 from ..utils.helpers import Helpers
 

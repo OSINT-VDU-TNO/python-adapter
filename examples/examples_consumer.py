@@ -1,5 +1,5 @@
-from naas_python_kafka import (TestBedAdapter, TestBedOptions)
-from naas_python_kafka.kafka.consumer_manager import ConsumerManager
+from test_bed_adapter import (TestBedAdapter, TestBedOptions)
+from test_bed_adapter.kafka.consumer_manager import ConsumerManager
 import time
 import sys
 import logging
