@@ -6,9 +6,10 @@ from ..options.test_bed_options import TestBedOptions
 
 
 class ConsumerManager():
-    def __init__(self, options: TestBedOptions, kafka_topic, handle_message):
+    def __init__(self, options: TestBedOptions, kafka_topic, handle_message, run):
         self.options = options
         self.handle_message = handle_message
+        self.run = run
 
         sr_conf = {'url': self.options.schema_registry}
         schema_registry_client = SchemaRegistryClient(sr_conf)
@@ -25,16 +26,13 @@ class ConsumerManager():
         self.consumer.subscribe([kafka_topic])
 
     def listen(self):
-        while True:
-            try:
-                # SIGINT can't be handled when polling, limit timeout to 1 second.
-                msg = self.consumer.poll(1.0)
-                if msg is None:
-                    continue
+        while self.run():
+            # SIGINT can't be handled when polling, limit timeout to 1 second.
+            msg = self.consumer.poll(1.0)
+            if msg is None:
+                continue
 
-                self.handle_message(msg.value())
-            except KeyboardInterrupt:
-                break
+            self.handle_message(msg.value())
         self.consumer.close()
 
     def stop(self):
