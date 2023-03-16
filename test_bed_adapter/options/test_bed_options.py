@@ -15,33 +15,39 @@ class TestBedOptions:
         # Partitioner type for producer. Values: random, consistent, consistent_random, murmur2, murmur2_random, fnv1a, fnv1a_random
         self.partitioner = 'random'
 
+        # Use string based keys for the producer
+        self.string_based_keys = True
+
+        # If string_based_keys is true, this is the type of the key. Values: id, group_id
+        self.string_key_type = "id"
+
         # If true, automatically register schema's on startup
         # Not implemented
-        #self.auto_register_schemas = False
+        # self.auto_register_schemas = False
 
         # If autoRegisterSchemas is true, contains the folder with *.avsc schema's to register
         # NOt implemented
-        #self.schema_folder = "data/schemas/"
+        # self.schema_folder = "data/schemas/"
 
         # If true fetch all schema versions (and not only the latest)
         # Not implemented
-        #self.fetch_all_versions = False
+        # self.fetch_all_versions = False
 
         # If true fetch all schema's (and not only the consume and produce topics)
         # Not implemented
-        #self.fetch_all_schemas = False
+        # self.fetch_all_schemas = False
 
         # If true fetch all schema's (and not only the consume and produce topics)
         # Not implemented
-        #self.fetch_all_topics = False
+        # self.fetch_all_topics = False
 
         # If set true, use the topics offset to retreive messages
         # Not implemented
-        #self.exclude_internal_topics = False
+        # self.exclude_internal_topics = False
 
         # Reset the offset messages on start.
         # Not implemented
-        #self.reset_offset_on_start = False
+        # self.reset_offset_on_start = False
 
         # Offset type possibles: earliest, latest, error
         self.offset_type = "earliest"
@@ -55,30 +61,30 @@ class TestBedOptions:
 
         # Send messages asynchronously
         # Send is async by default
-        #self.send_messages_asynchronously = True
+        # self.send_messages_asynchronously = True
 
         # Topics you want to consume
         # Not implemented
-        #self.consume = []
+        # self.consume = []
 
         # Topics you want to produce
         # Not implemented
-        #self.produce = []
+        # self.produce = []
 
         # If set true, use SSL
-        #self.use_ssl = False
+        # self.use_ssl = False
 
         # Path to trusted CA certificate. It will only be used if use_ssl is set true.
-        #self.ca_file = ""
+        # self.ca_file = ""
 
         # Path to client certificate. It will only be used if use_ssl is set true.
-        #self.cert_file: str = None
+        # self.cert_file: str = None
 
         # Path to client private-key file. It will only be used if use_ssl is set true.
-        #self.key_file: str = None
+        # self.key_file: str = None
 
         # Password for private key. It will only be used if use_ssl is set true.
-        #self.password_private_key: str = None
+        # self.password_private_key: str = None
 
         # Here we override the default values if they were introduced in the dictionary as an input of the constructor
         for key in dictionary:

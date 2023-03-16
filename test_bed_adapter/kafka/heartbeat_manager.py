@@ -2,6 +2,7 @@ from ..options.test_bed_options import TestBedOptions
 from .producer_manager import ProducerManager
 from ..utils.helpers import Helpers
 
+import copy
 import datetime
 import urllib.request
 import socket
@@ -10,7 +11,9 @@ import time
 
 class HeartbeatManager:
     def __init__(self, options: TestBedOptions, kafka_topic):
-        self.options = options
+        self.options = copy.deepcopy(options)
+        self.options.string_key_type = 'group_id'
+
         self.helper = Helpers()
         self.interval_thread = {}
 
@@ -42,4 +45,4 @@ class HeartbeatManager:
         self.kafka_heartbeat_producer.send_messages(messages=messages)
 
     def stop(self):
-        self.interval_thread()
+        self.kafka_heartbeat_producer.stop()

@@ -2,13 +2,13 @@ from confluent_kafka import SerializingProducer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from datetime import datetime
-from uuid import uuid4
 import time
 
+from ..utils.key import generate_key
 from ..options.test_bed_options import TestBedOptions
 
 
-class ProducerManager():
+class ProducerManager:
     def __init__(self, options: TestBedOptions, kafka_topic):
         self.options = options
         self.kafka_topic = kafka_topic
@@ -17,9 +17,11 @@ class ProducerManager():
         schema_registry_client = SchemaRegistryClient(schema_registry_conf)
 
         avro_message_serializer = AvroSerializer(
-            schema_registry_client=schema_registry_client, schema_str=schema_registry_client.get_latest_version(str(kafka_topic + '-value')).schema.schema_str)
+            schema_registry_client=schema_registry_client,
+            schema_str=schema_registry_client.get_latest_version(str(kafka_topic + '-value')).schema.schema_str)
         avro_key_serializer = AvroSerializer(
-            schema_registry_client=schema_registry_client, schema_str=schema_registry_client.get_latest_version(str(kafka_topic + '-key')).schema.schema_str)
+            schema_registry_client=schema_registry_client,
+            schema_str=schema_registry_client.get_latest_version(str(kafka_topic + '-key')).schema.schema_str)
 
         producer_conf = {'bootstrap.servers': self.options.kafka_host,
                          'key.serializer': avro_key_serializer,
@@ -32,10 +34,7 @@ class ProducerManager():
         for m in messages:
             date = datetime.utcnow()
             date_ms = int(time.mktime(date.timetuple())) * 1000
-            k = {"distributionID": str(uuid4()), "senderID": self.options.consumer_group,
-                 "dateTimeSent": date_ms, "dateTimeExpires": 0,
-                 "distributionStatus": "Test", "distributionKind": "Unknown"}
-            # Serve on_delivery callbacks from previous calls to produce()
+            k = generate_key(m, self.options)
             self.producer.poll(0.0)
             try:
                 self.producer.produce(

@@ -2,12 +2,14 @@ from ..options.test_bed_options import TestBedOptions
 from .producer_manager import ProducerManager
 from ..utils.helpers import Helpers
 from enum import Enum
-import json
 from datetime import datetime
+import copy
+import json
 import time
 
 
-class bcolors:
+
+class BColors:
     OKBLUE = '\033[94m'
     WARNING = '\033[93m'
     FAIL = '\033[91m'
@@ -23,17 +25,17 @@ def timestamp():
 
 
 def LogLevelToType(level):
-    if(level == LogLevel.Sill):
+    if (level == LogLevel.Sill):
         return 'SILLY'
-    elif(level == LogLevel.Debug):
+    elif (level == LogLevel.Debug):
         return 'DEBUG'
-    elif(level == LogLevel.Info):
+    elif (level == LogLevel.Info):
         return 'INFO'
-    elif(level == LogLevel.Warn):
+    elif (level == LogLevel.Warn):
         return 'WARN'
-    elif(level == LogLevel.Error):
+    elif (level == LogLevel.Error):
         return 'ERROR'
-    elif(level == LogLevel.Critical):
+    elif (level == LogLevel.Critical):
         return 'CRITICAL'
 
 
@@ -48,7 +50,9 @@ class LogLevel(Enum):
 
 class LogManager:
     def __init__(self, options: TestBedOptions, kafka_topic='system_logging'):
-        self.options = options
+        self.options = copy.deepcopy(options)
+        self.options.string_key_type = 'group_id'
+
         self.helper = Helpers()
         self.interval_thread = {}
 
@@ -74,22 +78,22 @@ class LogManager:
         self.log(LogLevel.Critical, msg)
 
     def log(self, level: LogLevel, msg):
-        if(not isinstance(msg, str)):
+        if (not isinstance(msg, str)):
             msg = json.dumps(msg)
 
         # Send to console
-        if(level == LogLevel.Sill):
-            print(f'{bcolors.OKBLUE}{timestamp()}: Silly: {msg}{bcolors.ENDC}')
-        elif(level == LogLevel.Debug):
-            print(f'{bcolors.OKBLUE}{timestamp()}: Debug: {msg}{bcolors.ENDC}')
-        elif(level == LogLevel.Info):
-            print(f'{bcolors.OKBLUE}{timestamp()}: Info: {msg}{bcolors.ENDC}')
-        elif(level == LogLevel.Warn):
-            print(f'{bcolors.WARNING}{timestamp()}: Warning: {msg}{bcolors.ENDC}')
-        elif(level == LogLevel.Error):
-            print(f'{bcolors.FAIL}{timestamp()}: Error: {msg}{bcolors.ENDC}')
-        elif(level == LogLevel.Critical):
-            print(f'{bcolors.FAIL}{timestamp()}: Critical: {msg}{bcolors.ENDC}')
+        if (level == LogLevel.Sill):
+            print(f'{BColors.OKBLUE}{timestamp()}: Silly: {msg}{BColors.ENDC}')
+        elif (level == LogLevel.Debug):
+            print(f'{BColors.OKBLUE}{timestamp()}: Debug: {msg}{BColors.ENDC}')
+        elif (level == LogLevel.Info):
+            print(f'{BColors.OKBLUE}{timestamp()}: Info: {msg}{BColors.ENDC}')
+        elif (level == LogLevel.Warn):
+            print(f'{BColors.WARNING}{timestamp()}: Warning: {msg}{BColors.ENDC}')
+        elif (level == LogLevel.Error):
+            print(f'{BColors.FAIL}{timestamp()}: Error: {msg}{BColors.ENDC}')
+        elif (level == LogLevel.Critical):
+            print(f'{BColors.FAIL}{timestamp()}: Critical: {msg}{BColors.ENDC}')
 
         # Send to Kafka
         payload = {
