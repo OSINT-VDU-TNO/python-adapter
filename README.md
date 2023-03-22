@@ -15,7 +15,7 @@ as explained [here](https://github.com/DRIVER-EU/avro-schemas).
 ## Installation
 You need to install [Python 3+](https://www.python.org/). 
 
-To run the examples you will need to install the dependencies specified on the file[requirements.txt](https://github.com/DRIVER-EU/python-test-bed-adapter/blob/master/requirements.txt)
+To run the examples you will need to install the dependencies specified on the file [requirements.txt](https://github.com/DRIVER-EU/python-test-bed-adapter/blob/master/requirements.txt)
 For that, run
 ```pip3 install -r requirements.txt```
 from the project folder.
