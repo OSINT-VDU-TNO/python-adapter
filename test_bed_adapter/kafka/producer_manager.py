@@ -22,7 +22,8 @@ class ProducerManager:
         avro_key_serializer = AvroSerializer(
             schema_registry_client=schema_registry_client,
             schema_str=schema_registry_client.get_latest_version(str(kafka_topic + '-key')).schema.schema_str)
-
+        self.schema = schema_registry_client.get_latest_version(kafka_topic + "-value")
+        self.schema_str = self.schema.schema.schema_str
         producer_conf = {'bootstrap.servers': self.options.kafka_host,
                          'key.serializer': avro_key_serializer,
                          'value.serializer': avro_message_serializer,

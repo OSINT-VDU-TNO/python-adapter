@@ -13,11 +13,14 @@ class ConsumerManager():
 
         sr_conf = {'url': self.options.schema_registry}
         schema_registry_client = SchemaRegistryClient(sr_conf)
-        avro_deserializer = AvroDeserializer(schema_registry_client)
+        self.avro_deserializer = AvroDeserializer(schema_registry_client)
+        self.schema = schema_registry_client.get_latest_version(kafka_topic + "-value")
+        self.schema_str = self.schema.schema.schema_str
+        self.kafka_topic = kafka_topic
 
         consumer_conf = {'bootstrap.servers': self.options.kafka_host,
-                         'key.deserializer': avro_deserializer,
-                         'value.deserializer': avro_deserializer,
+                         'key.deserializer': self.avro_deserializer,
+                         'value.deserializer': self.avro_deserializer,
                          'group.id': self.options.consumer_group,
                          'message.max.bytes': self.options.message_max_bytes,
                          'auto.offset.reset': self.options.offset_type}
