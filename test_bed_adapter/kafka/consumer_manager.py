@@ -35,7 +35,7 @@ class ConsumerManager():
             if msg is None:
                 continue
 
-            self.handle_message(msg.value())
+            self.handle_message(msg.value(), msg.topic())
         self.consumer.close()
 
     def stop(self):
