@@ -1,6 +1,7 @@
-from confluent_kafka import DeserializingConsumer
+from confluent_kafka import DeserializingConsumer, TopicPartition
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
+import time
 
 from ..options.test_bed_options import TestBedOptions
 
@@ -24,18 +25,34 @@ class ConsumerManager():
                          'group.id': self.options.consumer_group,
                          'message.max.bytes': self.options.message_max_bytes,
                          'auto.offset.reset': self.options.offset_type}
-
         self.consumer = DeserializingConsumer(consumer_conf)
-        self.consumer.subscribe([kafka_topic])
+        if self.options.offset_type == 'earliest':
+            self.consumer.assign([TopicPartition(topic=self.kafka_topic, partition=0, offset=0)])
+        else:
+            self.consumer.subscribe([kafka_topic])
 
     def listen(self):
+        _start_time = time.time()
+        _latest_message = None
+
+        # Ignore messages for a period of time
+        while True and self.options.ignore_timeout:
+            msg = self.consumer.poll(1)
+            if msg:
+                _latest_message = msg
+            elapsed_time = time.time() - _start_time
+            if elapsed_time > self.options.ignore_timeout:
+                break
+        if _latest_message and self.options.use_latest:
+            self.handle_message(_latest_message.value(), _latest_message.topic())
+
+        # Continue to listen for messages
         while self.run():
-            # SIGINT can't be handled when polling, limit timeout to 1 second.
-            msg = self.consumer.poll(1.0)
+            msg = self.consumer.poll(1)
             if msg is None:
                 continue
-
             self.handle_message(msg.value(), msg.topic())
+
         self.consumer.close()
 
     def stop(self):

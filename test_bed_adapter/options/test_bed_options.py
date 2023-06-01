@@ -50,7 +50,11 @@ class TestBedOptions:
         # self.reset_offset_on_start = False
 
         # Offset type possibles: earliest, latest, error
-        self.offset_type = "earliest"
+        self.offset_type = "latest"
+        # Ignore messages that for timeout
+        self.ignore_timeout = None
+        # If true, use the send the latest message
+        self.use_latest = False
 
         # How often should the adapter try to reconnect to the kafka server if the first time fails
         # Not implemented
