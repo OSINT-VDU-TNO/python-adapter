@@ -26,10 +26,7 @@ class ConsumerManager():
                          'message.max.bytes': self.options.message_max_bytes,
                          'auto.offset.reset': self.options.offset_type}
         self.consumer = DeserializingConsumer(consumer_conf)
-        if self.options.offset_type == 'earliest':
-            self.consumer.assign([TopicPartition(topic=self.kafka_topic, partition=0, offset=0)])
-        else:
-            self.consumer.subscribe([kafka_topic])
+        self.consumer.subscribe([kafka_topic])
 
     def listen(self):
         _start_time = time.time()
