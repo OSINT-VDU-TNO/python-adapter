@@ -34,3 +34,41 @@ from the project folder.
 - url_producer: creates a message with 4 URLs to RSS feeds on the topic ('system_rss_urls')
 - rss_producer: listens to url messages ('system_rss_urls') and produces RSS messages ('system_rss_urls')
 - rss_consumer: listens to RSS messages ('system_rss_urls') and prints them to console.
+
+## Uploading to PyPi
+
+1. Ensure you have the necessary tools installed: Make sure you have `setuptools` and `wheel` installed. You can install them using `pip`:
+
+```bash
+pip install setuptools wheel
+Build the distribution files: In the root directory of your project, run the following command to build the distribution files (wheel and source distribution):
+```
+
+2. Build the distribution files: In the root directory of your project, run the following command to build the distribution files (wheel and source distribution):
+
+```bash
+python setup.py sdist bdist_wheel
+This command will generate the distribution files inside the dist directory.
+```
+This command will generate the distribution files inside the dist directory.
+
+3. Register an account on PyPI: If you haven't done so already, create an account on PyPI and verify your email address.
+
+4. Install and configure `twine`: Install `twine`, a tool used to upload packages to PyPI, using `pip`:
+
+```bash
+pip install twine
+Upload the package to PyPI: Use twine to upload the distribution files to PyPI:
+```
+
+5. Upload the package to PyPI: Use twine to upload the distribution files to PyPI:
+
+```bash
+twine upload dist/*
+This command will prompt you to enter your PyPI username and password. Once provided, twine will upload the distribution files to PyPI.
+```
+This command will prompt you to enter your PyPI username and password. Once provided, twine will upload the distribution files to PyPI.
+
+6. Verify the package on PyPI: Visit your package page on [PyPI](https://pypi.org/project/osint-python-test-bed-adapter/) to ensure that the package has been successfully uploaded and published.
+
+Remember to update the version number in your `setup.py` file for each new release to avoid conflicts.
