@@ -1,12 +1,13 @@
-from confluent_kafka import DeserializingConsumer, TopicPartition
+import time
+
+from confluent_kafka import DeserializingConsumer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
-import time
 
 from ..options.test_bed_options import TestBedOptions
 
 
-class ConsumerManager():
+class ConsumerManager:
     def __init__(self, options: TestBedOptions, kafka_topic, handle_message, run):
         self.options = options
         self.handle_message = handle_message
@@ -26,7 +27,16 @@ class ConsumerManager():
                          'message.max.bytes': self.options.message_max_bytes,
                          'auto.offset.reset': self.options.offset_type}
         self.consumer = DeserializingConsumer(consumer_conf)
-        self.consumer.subscribe([kafka_topic])
+
+        def on_assign(c, ps):
+            for p in ps:
+                p.offset = 0
+            c.assign(ps)
+
+        if self.options.offset_type == 'earliest':
+            self.consumer.subscribe([kafka_topic], on_assign=on_assign)
+        else:
+            self.consumer.subscribe([kafka_topic])
 
     def listen(self):
         _start_time = time.time()
