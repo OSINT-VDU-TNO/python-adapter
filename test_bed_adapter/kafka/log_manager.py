@@ -6,7 +6,6 @@ from enum import Enum
 
 from .producer_manager import ProducerManager
 from ..options.test_bed_options import TestBedOptions
-from ..utils.helpers import Helpers
 
 
 class BColors:
@@ -53,11 +52,7 @@ class LogManager:
         self.options = copy.deepcopy(options)
         self.options.string_key_type = 'group_id'
 
-        self.helper = Helpers()
-        self.interval_thread = {}
-
-        self.kafka_log_producer = ProducerManager(
-            options=self.options, kafka_topic=kafka_topic)
+        self.kafka_log_producer = ProducerManager(options=self.options, kafka_topic=kafka_topic)
 
     def sill(self, msg):
         self.log(LogLevel.Sill, msg)

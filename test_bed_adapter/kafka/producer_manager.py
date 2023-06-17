@@ -1,11 +1,12 @@
+import time
+from datetime import datetime
+
 from confluent_kafka import SerializingProducer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
-from datetime import datetime
-import time
 
-from ..utils.key import generate_key
 from ..options.test_bed_options import TestBedOptions
+from ..utils.key import generate_key
 
 
 class ProducerManager:
@@ -38,8 +39,7 @@ class ProducerManager:
             k = generate_key(m, self.options)
             self.producer.poll(0.0)
             try:
-                self.producer.produce(
-                    topic=self.kafka_topic, key=k, value=m, timestamp=date_ms)
+                self.producer.produce(topic=self.kafka_topic, key=k, value=m, timestamp=date_ms)
             except ValueError:
                 print("Invalid input, discarding record...")
                 continue
