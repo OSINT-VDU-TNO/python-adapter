@@ -74,7 +74,10 @@ class LogManager:
 
     def log(self, level: LogLevel, msg):
         if not isinstance(msg, str):
-            msg = json.dumps(msg)
+            try:
+                msg = json.dumps(msg)
+            except:
+                msg = str(msg)
 
         # Send to console
         if level == LogLevel.Sill:
@@ -99,4 +102,7 @@ class LogManager:
                 "log": msg
             }
             message = [payload]
-            self.kafka_log_producer.send_messages(message)
+            try:
+                self.kafka_log_producer.send_messages(message)
+            except Exception as e:
+                print(f'Failed to send message to kafka: {e}')
