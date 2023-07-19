@@ -2,7 +2,7 @@ import logging
 from threading import Thread
 from time import time, sleep
 
-from confluent_kafka import DeserializingConsumer
+from confluent_kafka import DeserializingConsumer, KafkaError
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 
@@ -13,11 +13,10 @@ class ConsumerManager(Thread):
     def __init__(self, options: TestBedOptions, kafka_topic, handle_message):
         super().__init__()
         self.logger = logging.getLogger(__name__)
+        self.running = True
         self.daemon = True
         self.options = options
         self.handle_message = handle_message
-        self.running = True
-
         self.latest_message = None
 
         sr_conf = {'url': self.options.schema_registry}
@@ -47,6 +46,8 @@ class ConsumerManager(Thread):
         self.listen()
 
     def stop(self):
+        """Stop the consumer"""
+        self.logger.info(f"Stopping consumer for {self.kafka_topic}")
         self.running = False
 
     def reset_partition_offsets(self):
@@ -95,9 +96,22 @@ class ConsumerManager(Thread):
         """Listen for messages on the topic and handle them with the provided callback"""
         # Continue to listen for messages
         while self.running:
-            msg = self.consumer.poll(1)
-            if msg is None:
-                continue
-            self.handle_message(msg.value(), msg.topic())
-        # Close down consumer to commit final offsets.
+            try:
+                msg = self.consumer.poll(1)  # Adjust the timeout as needed
+                if msg is None:
+                    continue
+                if msg.error():
+                    if msg.error().code() == KafkaError._PARTITION_EOF:
+                        # Handle end of partition
+                        continue
+                    else:
+                        # Handle other Kafka errors
+                        self.logger.error(f"Kafka error: {msg.error()}")
+                        break
+                self.handle_message(msg.value(), msg.topic())
+            except Exception as e:
+                self.logger.error(f"Exception occurred: {e}")
+                break
+
+        self.logger.error(f"Consumer for {self.kafka_topic} stopped")
         self.consumer.close()
