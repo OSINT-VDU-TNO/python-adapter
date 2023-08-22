@@ -33,7 +33,8 @@ class ConsumerManager(Thread):
             'value.deserializer': self.avro_deserializer,
             'group.id': self.options.consumer_group,
             'message.max.bytes': self.options.message_max_bytes,
-            'auto.offset.reset': self.options.offset_type
+            'auto.offset.reset': self.options.offset_type,
+            'max.poll.interval.ms': 600000
         }
 
         self.consumer = DeserializingConsumer(consumer_conf)
