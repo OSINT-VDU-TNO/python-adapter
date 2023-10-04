@@ -66,6 +66,9 @@ class LogManager:
     def warn(self, msg):
         self.log(LogLevel.Warn, msg)
 
+    def warning(self, msg):
+        self.log(LogLevel.Warn, msg)
+
     def error(self, msg):
         self.log(LogLevel.Error, msg)
 

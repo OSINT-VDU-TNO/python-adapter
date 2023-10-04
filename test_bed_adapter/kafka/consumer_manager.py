@@ -34,7 +34,8 @@ class ConsumerManager(Thread):
             'group.id': self.options.consumer_group,
             'message.max.bytes': self.options.message_max_bytes,
             'auto.offset.reset': self.options.offset_type,
-            'max.poll.interval.ms': 600000
+            'max.poll.interval.ms': self.options.max_poll_interval_ms,
+            'session.timeout.ms': self.options.session_timeout_ms,
         }
 
         self.consumer = DeserializingConsumer(consumer_conf)

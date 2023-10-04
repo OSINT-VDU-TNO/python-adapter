@@ -21,6 +21,11 @@ class TestBedOptions:
         # If string_based_keys is true, this is the type of the key. Values: id, group_id
         self.string_key_type = "id"
 
+        # Interval poll in ms
+        self.max_poll_interval_ms = 600000
+
+        # Session timeout in ms
+        self.session_timeout_ms = 900000
         # If true, automatically register schema's on startup
         # Not implemented
         # self.auto_register_schemas = False
