@@ -2,7 +2,7 @@ import logging
 from threading import Thread
 from time import time, sleep
 
-from confluent_kafka import DeserializingConsumer, KafkaError
+from confluent_kafka import DeserializingConsumer, TopicPartition, KafkaError
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 
@@ -74,8 +74,35 @@ class ConsumerManager(Thread):
         except Exception as e:
             self.logger.error(f"Error resetting partition offsets: {e}")
             return
+    
+    def pause(self, topic: str):
+        # Get the topic's partitions
+        metadata = self.consumer.list_topics(topic, timeout=10)
+        if metadata.topics[topic].error is not None:
+            return
+        # Construct TopicPartition list of partitions to query
+        partitions = [TopicPartition(topic, p) for p in metadata.topics[topic].partitions]
+        self.consumer.pause(partitions)
+
+    def resume(self, topic: str):
+        metadata = self.consumer.list_topics(topic, timeout=10)
+        if metadata.topics[topic].error is not None:
+            return
+        # Construct TopicPartition list of partitions to query
+        partitions = [TopicPartition(topic, p) for p in metadata.topics[topic].partitions]
+        self.consumer.resume(partitions)
+        # topics_metadata = self.consumer.list_topics(topic = topic, timeout = -1)
+        # if topics_metadata == None or topics_metadata.topics == None:
+        #     return
+        # topic_metadata = topics_metadata.topics.get(topic)
+        # if topic_metadata and topic_metadata.error == None:
+        #     self.consumer.resume(topic_metadata.partitions)
 
     def ingore_messages(self):
+        """ Deprecated: use ignore_messages """
+        return self.ignore_messages()
+
+    def ignore_messages(self):
         """Ignore messages for a period of time"""
         _start_time = time()
         # Ignore messages for a period of time
