@@ -40,15 +40,15 @@ from the project folder.
 1. Ensure you have the necessary tools installed: Make sure you have `setuptools` and `wheel` installed. You can install them using `pip`:
 
 ```bash
+# Build the distribution files: In the root directory of your project, run the following command to build the distribution files (wheel and source distribution):
 pip install setuptools wheel
-Build the distribution files: In the root directory of your project, run the following command to build the distribution files (wheel and source distribution):
 ```
 
 2. Build the distribution files: In the root directory of your project, run the following command to build the distribution files (wheel and source distribution):
 
 ```bash
+# This command will generate the distribution files inside the dist directory.
 python setup.py sdist bdist_wheel
-This command will generate the distribution files inside the dist directory.
 ```
 This command will generate the distribution files inside the dist directory.
 
@@ -57,18 +57,18 @@ This command will generate the distribution files inside the dist directory.
 4. Install and configure `twine`: Install `twine`, a tool used to upload packages to PyPI, using `pip`:
 
 ```bash
+# Upload the package to PyPI: Use twine to upload the distribution files to PyPI:
 pip install twine
-Upload the package to PyPI: Use twine to upload the distribution files to PyPI:
 ```
 
-5. Upload the package to PyPI: Use twine to upload the distribution files to PyPI:
+1. Upload the package to PyPI: Use twine to upload the distribution files to PyPI:
 
 ```bash
+# This command will prompt you to enter your PyPI username and password. Once provided, twine will upload the distribution files to PyPI.
 twine upload dist/*
-This command will prompt you to enter your PyPI username and password. Once provided, twine will upload the distribution files to PyPI.
 ```
 This command will prompt you to enter your PyPI username and password. Once provided, twine will upload the distribution files to PyPI.
 
-6. Verify the package on PyPI: Visit your package page on [PyPI](https://pypi.org/project/osint-python-test-bed-adapter/) to ensure that the package has been successfully uploaded and published.
+1. Verify the package on PyPI: Visit your package page on [PyPI](https://pypi.org/project/osint-python-test-bed-adapter/) to ensure that the package has been successfully uploaded and published.
 
 Remember to update the version number in your `setup.py` file for each new release to avoid conflicts.
