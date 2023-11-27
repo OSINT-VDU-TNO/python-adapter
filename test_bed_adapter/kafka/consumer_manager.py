@@ -76,6 +76,7 @@ class ConsumerManager(Thread):
             return
     
     def pause(self, topic: str):
+        """Pause consuming from a topic"""
         # Get the topic's partitions
         metadata = self.consumer.list_topics(topic, timeout=10)
         if metadata.topics[topic].error is not None:
@@ -85,6 +86,7 @@ class ConsumerManager(Thread):
         self.consumer.pause(partitions)
 
     def resume(self, topic: str):
+        """Resume consuming from a topic"""
         metadata = self.consumer.list_topics(topic, timeout=10)
         if metadata.topics[topic].error is not None:
             return
