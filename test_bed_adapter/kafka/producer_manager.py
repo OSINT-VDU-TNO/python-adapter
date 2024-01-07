@@ -28,7 +28,8 @@ class ProducerManager:
         producer_conf = {'bootstrap.servers': self.options.kafka_host,
                          'key.serializer': avro_key_serializer,
                          'value.serializer': avro_message_serializer,
-                         'partitioner': self.options.partitioner}
+                         'partitioner': self.options.partitioner,
+                         'compression.type': 'gzip'}
 
         self.producer = SerializingProducer(producer_conf)
 
