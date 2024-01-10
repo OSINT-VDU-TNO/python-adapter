@@ -25,12 +25,14 @@ class ProducerManager:
             schema_str=schema_registry_client.get_latest_version(str(kafka_topic + '-key')).schema.schema_str)
         self.schema = schema_registry_client.get_latest_version(kafka_topic + "-value")
         self.schema_str = self.schema.schema.schema_str
-        producer_conf = {'bootstrap.servers': self.options.kafka_host,
-                         'key.serializer': avro_key_serializer,
-                         'value.serializer': avro_message_serializer,
-                         'partitioner': self.options.partitioner,
-                         'compression.type': 'gzip'}
-
+        producer_conf = {
+            'bootstrap.servers': self.options.kafka_host,
+            'key.serializer': avro_key_serializer,
+            'value.serializer': avro_message_serializer,
+            'partitioner': self.options.partitioner,
+            'message.max.bytes': self.options.message_max_bytes,
+            'compression.type': 'gzip',
+        }
         self.producer = SerializingProducer(producer_conf)
 
     def send_messages(self, messages: list):
