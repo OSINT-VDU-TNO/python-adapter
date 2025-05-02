@@ -10,7 +10,7 @@ class TestBedOptions:
         self.schema_registry = "localhost:3502"
 
         # Max message bytes
-        self.message_max_bytes = 1000000
+        self.message_max_bytes = 10000000
 
         # Partitioner type for producer. Values: random, consistent, consistent_random, murmur2, murmur2_random, fnv1a, fnv1a_random
         self.partitioner = 'random'
@@ -22,10 +22,13 @@ class TestBedOptions:
         self.string_key_type = "id"
 
         # Interval poll in ms
-        self.max_poll_interval_ms = 600000
+        self.max_poll_interval_ms = 60000
 
         # Session timeout in ms
-        self.session_timeout_ms = 900000
+        self.session_timeout_ms = 90000
+        # Set auto commit interval in ms
+        self.auto_commit_interval_ms = 5000
+        self.processing_thread_count = 1
         # If true, automatically register schema's on startup
         # Not implemented
         # self.auto_register_schemas = False
