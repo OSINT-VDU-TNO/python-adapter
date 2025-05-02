@@ -66,7 +66,8 @@ from the project folder.
 
     ```bash
     # This command will prompt you to enter your PyPI username and password. Once provided, twine will upload the distribution files to PyPI.
-    twine upload dist/*
+    # Use $HOME/.pypirc if you want to use a different configuration file.
+    twine upload --repository osint-python-test-bed-adapter dist/*
     ```
 
     This command will prompt you to enter your PyPI username and password. Once provided, twine will upload the distribution files to PyPI.
