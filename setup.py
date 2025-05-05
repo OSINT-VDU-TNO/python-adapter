@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="osint-python-test-bed-adapter",
-    version="2.5.1",
+    version="2.5.2",
     author="TimovdK",
     author_email="timo_kuil@hotmail.com",
     description="Python adapter for Kafka",
@@ -16,7 +16,10 @@ setuptools.setup(
     install_requires=[
         'confluent_kafka',
         'fastavro',
-        'requests'
+        'requests',
+        # dependencies required by confluent_kafka's schema registry
+        'authlib',
+        'cachetools'
     ],
     packages=setuptools.find_packages(),
     classifiers=[
