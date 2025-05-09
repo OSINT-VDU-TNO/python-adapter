@@ -75,3 +75,23 @@ from the project folder.
 6. Verify the package on PyPI: Visit your package page on [PyPI](https://pypi.org/project/osint-python-test-bed-adapter/) to ensure that the package has been successfully uploaded and published.
 
     Remember to update the version number in your `setup.py` file for each new release to avoid conflicts.
+
+In short:
+
+```bash
+# Install dependencies
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+# Create a new release after updating the setup.py package version number
+rm -rf dist
+python setup.py sdist bdist_wheel
+twine upload --repository osint-python-test-bed-adapter dist/*
+```
+
+```bash
+/Users/erik/dev/doc-to-weaviate/.venv/lib/python3.13/site-packages/test_bed_adapter/kafka/heartbeat_manager.py:41: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  date = datetime.datetime.utcnow()
+/Users/erik/dev/doc-to-weaviate/.venv/lib/python3.13/site-packages/test_bed_adapter/kafka/producer_manager.py:40: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  date = datetime.utcnow()
+```

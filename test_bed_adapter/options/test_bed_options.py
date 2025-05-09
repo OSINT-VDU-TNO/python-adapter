@@ -22,7 +22,7 @@ class TestBedOptions:
         self.string_key_type = "id"
 
         # Interval poll in ms
-        self.max_poll_interval_ms = 60000
+        self.max_poll_interval_ms = 300000
 
         # Session timeout in ms
         self.session_timeout_ms = 90000
