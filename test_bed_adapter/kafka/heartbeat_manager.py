@@ -42,8 +42,7 @@ class HeartbeatManager(Thread):
             time.sleep(self.options.heartbeat_interval)
 
     def send_heartbeat_message(self):
-        date_utc = datetime.datetime.now(datetime.timezone.utc)
-        date_ms = int(date_utc.timestamp() * 1000)
+        date_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
 
         message_json = {
             "id": self.options.consumer_group,
