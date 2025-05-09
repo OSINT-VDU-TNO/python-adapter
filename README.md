@@ -88,10 +88,3 @@ rm -rf dist
 python setup.py sdist bdist_wheel
 twine upload --repository osint-python-test-bed-adapter dist/*
 ```
-
-```bash
-/Users/erik/dev/doc-to-weaviate/.venv/lib/python3.13/site-packages/test_bed_adapter/kafka/heartbeat_manager.py:41: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-  date = datetime.datetime.utcnow()
-/Users/erik/dev/doc-to-weaviate/.venv/lib/python3.13/site-packages/test_bed_adapter/kafka/producer_manager.py:40: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-  date = datetime.utcnow()
-```
