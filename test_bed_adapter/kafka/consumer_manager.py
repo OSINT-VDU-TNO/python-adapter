@@ -1,7 +1,8 @@
 import logging
 from threading import Thread, Event, Lock
-from time import sleep
-import concurrent.futures
+from time import sleep, time
+import threading
+from typing import Any, Dict, Literal, Tuple, Union
 
 from confluent_kafka import DeserializingConsumer, KafkaError
 from confluent_kafka.schema_registry import SchemaRegistryClient
@@ -43,20 +44,35 @@ class ConsumerManager(Thread):
 
         # Control flow events
         self._stop_event = Event()
-        self._pause_event = Event()
 
         # Processing state
         self._processing_lock = Lock()
-        self._currently_processing = False
+        self._processing_flag = False
+
+        # Health monitoring state
+        self._health_lock = Lock()
+        self._health_status = {
+            "status": "INITIALIZING",
+            "message_processing_count": 0,
+            "error_count": 0,
+            "last_error": None,
+            "last_error_time": None,
+            "max_poll_interval_exceeded": False,
+            "current_assigned_partitions": 0,
+        }
 
         # --- Schema Registry and Deserializer Setup ---
         try:
             sr_conf = {"url": self.options.schema_registry}
             schema_registry_client = SchemaRegistryClient(sr_conf)
             self.avro_deserializer = AvroDeserializer(schema_registry_client)
+            self._update_health_status("READY")
         except Exception as e:
             self.logger.error(f"Failed to initialize Schema Registry: {e}")
             self.running = False
+            self._update_health_status(
+                "ERROR", last_error=str(e), last_error_time=time()
+            )
 
         # --- Configure Consumer Based on Mode ---
         consumer_conf = self._build_consumer_config()
@@ -72,13 +88,6 @@ class ConsumerManager(Thread):
         except Exception as e:
             self.logger.error(f"Failed to initialize Kafka Consumer: {e}")
             self.running = False
-
-        # For manual mode, we'll use a thread pool with a single worker
-        if self.processing_mode == "manual_commit":
-            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            self._current_task = None
-        else:
-            self.executor = None
 
     def _build_consumer_config(self):
         """Build the Kafka consumer configuration based on the processing mode"""
@@ -106,8 +115,6 @@ class ConsumerManager(Thread):
                 {
                     "enable.auto.commit": False,
                     "max.poll.interval.ms": self.options.max_poll_interval_ms,
-                    # We'll handle limiting to one message per poll in our code
-                    # since max.poll.records is not supported in confluent_kafka
                 }
             )
 
@@ -117,9 +124,9 @@ class ConsumerManager(Thread):
         """Main thread execution method"""
         if not self.running or self.consumer is None:
             self.logger.error("Consumer failed to initialize. Exiting run.")
-            if self.processing_mode == "manual_commit" and self.executor:
-                self.executor.shutdown(wait=False)
             return
+
+        self._update_health_status("RUNNING")
 
         # Start processing based on mode
         if self.processing_mode == "auto_commit":
@@ -127,56 +134,97 @@ class ConsumerManager(Thread):
         else:
             self.run_manual_commit_mode()
 
-        # Cleanup
-        if self.processing_mode == "manual_commit" and self.executor:
-            # Wait for any in-progress task
-            if self._current_task:
-                self.logger.info("Waiting for current task to complete...")
-                concurrent.futures.wait([self._current_task], timeout=30.0)
-
-            # Shutdown the executor
-            self.executor.shutdown(wait=True)
-
         # Close the consumer
         if self.consumer:
             self.consumer.close()
             self.logger.info(f"Consumer for {self.kafka_topic} closed.")
+
+        self._update_health_status("STOPPED")
 
     def stop(self):
         """Signal the consumer to stop"""
         self.logger.info(f"Stopping consumer for {self.kafka_topic}")
         self._stop_event.set()
         self.running = False
+        self._update_health_status("STOPPING")
 
     def pause(self):
         """Pause consuming messages"""
-        self._pause_event.set()
-        self.logger.info(f"Paused consuming from {self.kafka_topic}")
+        assigned_partitions = self.consumer.assignment()
+        if assigned_partitions:
+            self.consumer.pause(assigned_partitions)
+            self.logger.debug(f"Paused consumer for {assigned_partitions}")
+            self._update_health_status("PAUSED")
 
     def resume(self):
         """Resume consuming messages"""
-        self._pause_event.clear()
-        self.logger.info(f"Resumed consuming from {self.kafka_topic}")
+        assigned_partitions = self.consumer.assignment()
+        if assigned_partitions:
+            self.consumer.resume(assigned_partitions)
+            self.logger.debug(f"Resumed consumer for {assigned_partitions}")
+            self._update_health_status("RUNNING")
+
+    def _update_health_status(self, status, **kwargs):
+        """Update the health status with new information"""
+        with self._health_lock:
+            self._health_status["status"] = status
+            for key, value in kwargs.items():
+                if key in self._health_status:
+                    self._health_status[key] = value
+
+    def get_health_status(
+        self,
+    ) -> Tuple[
+        Union[Literal[200], Literal[503]],
+        Union[Literal["OK"], Literal["ERROR"]],
+        Dict[str, Any],
+    ]:
+        """
+        Get the current health status of the consumer.
+
+        Returns a tuple of (http_status_code=200 when OK or 503 otherwise, status_message=ERROR or OK, details_dict)
+        """
+        with self._health_lock:
+            status_copy = self._health_status.copy()
+        # Determine if the consumer is healthy based on various factors
+        if status_copy["status"] == "ERROR" or not self.running:
+            return 503, "ERROR", status_copy
+        if status_copy["max_poll_interval_exceeded"]:
+            return 503, "ERROR", status_copy
+        # All checks passed, consumer is healthy
+        return 200, "OK", status_copy
 
     def run_auto_commit_mode(self):
         """Run in auto-commit mode - process messages in batches with auto-commit"""
         self.logger.info(f"Starting auto-commit consumer for {self.kafka_topic}")
 
         while not self._stop_event.is_set() and self.running:
-            if self._pause_event.is_set():
-                sleep(0.5)
-                continue
-
             try:
-                # Poll for messages - in confluent_kafka this returns a single Message object,
-                # not a batch of messages like in the Java client
+                # Poll for messages
                 msg = self.consumer.poll(timeout=1.0)
+
+                # Update partition count
+                assigned_partitions = self.consumer.assignment()
+                self._update_health_status(
+                    "OK",
+                    current_assigned_partitions=(
+                        len(assigned_partitions) if assigned_partitions else 0
+                    ),
+                )
 
                 if msg is None:
                     continue
 
                 if msg.error():
-                    self._handle_kafka_error(msg)
+                    error_handled = self._handle_kafka_error(msg)
+                    if not error_handled:
+                        # If error was not handled as a normal condition, update health status
+                        self._update_health_status(
+                            "WARNING",
+                            last_error=f"Kafka error: {msg.error()}",
+                            last_error_time=time(),
+                            error_count=self._health_status["error_count"] + 1,
+                        )
                     continue
 
                 # Process the message directly in this thread
@@ -185,6 +233,13 @@ class ConsumerManager(Thread):
                         f"Processing message from {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
                     )
                     self._handle_message_callback(msg.value(), msg.topic())
+                    self._update_health_status(
+                        "OK",
+                        message_processing_count=self._health_status[
+                            "message_processing_count"
+                        ]
+                        + 1,
+                    )
                     self.logger.info(
                         f"Successfully processed message: {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
                     )
@@ -192,10 +247,22 @@ class ConsumerManager(Thread):
                     # In auto-commit mode, we log the error but continue processing
                     # The failed message will be auto-committed
                     self.logger.error(f"Error processing message: {e}", exc_info=True)
+                    self._update_health_status(
+                        "WARNING",
+                        last_error=str(e),
+                        last_error_time=time(),
+                        error_count=self._health_status["error_count"] + 1,
+                    )
 
             except Exception as e:
                 self.logger.error(
                     f"Unexpected error in consumer loop: {e}", exc_info=True
+                )
+                self._update_health_status(
+                    "ERROR",
+                    last_error=str(e),
+                    last_error_time=time(),
+                    error_count=self._health_status["error_count"] + 1,
                 )
                 if self.running:
                     # Small delay to prevent tight error loops
@@ -206,128 +273,161 @@ class ConsumerManager(Thread):
         self.logger.info(f"Starting manual-commit consumer for {self.kafka_topic}")
 
         while not self._stop_event.is_set() and self.running:
-            # Check if we should pause
-            if self._pause_event.is_set():
-                sleep(0.5)
-                continue
-
-            # Check if we're still processing the last message
-            if self._current_task and not self._current_task.done():
-                # The previous message is still being processed
-                # Poll with timeout=0 to maintain consumer group liveness
-                # without fetching new messages
-                self.consumer.poll(0)
-                sleep(0.1)
-                continue
-
             try:
-                # In confluent_kafka, we don't have max.poll.records, so we handle one message at a time
-                # manually from whatever batch was returned
+                self._update_health_status("OK", last_poll_time=time())
+                # Check if we're still processing a message
+                with self._processing_lock:
+                    if self._processing_flag:
+                        # Continue polling with a short timeout to maintain consumer heartbeat
+                        # but don't fetch or process messages
+                        self.consumer.poll(timeout=0.1)
+                        sleep(0.1)
+                        continue
+
+                # Poll for a new message
                 msg = self.consumer.poll(timeout=1.0)
 
-                if msg is None:
-                    continue  # No message received, poll again
+                assigned_partitions = self.consumer.assignment()
+                self._update_health_status(
+                    "OK",
+                    current_assigned_partitions=(
+                        len(assigned_partitions) if assigned_partitions else 0
+                    ),
+                )
 
-                if msg.error():
-                    self._handle_kafka_error(msg)
+                if msg is None:
                     continue
 
-                # Got a valid message - process it one at a time
-                self._process_message_safely(msg)
+                if msg.error():
+                    error_handled = self._handle_kafka_error(msg)
+                    if not error_handled:
+                        # If error was not handled as a normal condition, update health status
+                        self._update_health_status(
+                            "WARNING",
+                            last_error=f"Kafka error: {msg.error()}",
+                            last_error_time=time(),
+                            error_count=self._health_status["error_count"] + 1,
+                        )
+                    continue
 
-                # Important: After processing one message, we immediately exit the polling loop
-                # This simulates processing one message at a time even if more were fetched
+                # Got a valid message - process it
+                with self._processing_lock:
+                    # Mark that we're processing a message
+                    self._processing_flag = True
+                    # Pause the consumer for all assigned partitions
+                    self.pause()
+
+                # Process the message in a separate thread
+                processing_thread = threading.Thread(
+                    target=self._process_message_in_thread, args=(msg,), daemon=True
+                )
+                processing_thread.start()
 
             except Exception as e:
                 self.logger.error(
                     f"Unexpected error in consumer loop: {e}", exc_info=True
                 )
+                self._update_health_status(
+                    "ERROR",
+                    last_error=str(e),
+                    last_error_time=time(),
+                    error_count=self._health_status["error_count"] + 1,
+                )
                 if self.running:
                     # Small delay to prevent tight error loops
                     sleep(1.0)
 
-    def _process_message_safely(self, msg):
-        """Process a single message with proper error handling in manual mode"""
-        # Pause the consumer while processing
-        self.pause()
-
-        # Mark that we're starting to process a message
-        with self._processing_lock:
-            self._currently_processing = True
-
-        # Process in the worker thread
-        self._current_task = self.executor.submit(self._process_single_message, msg)
-
-        # Add a callback for when processing completes
-        self._current_task.add_done_callback(self._on_message_processed)
-
-    def _process_single_message(self, msg):
-        """Process a single message in manual mode"""
-        value = msg.value()
-        topic = msg.topic()
-
+    def _process_message_in_thread(self, msg):
+        """Process a message in a separate thread and handle resuming the consumer"""
         try:
+            value = msg.value()
+            topic = msg.topic()
+
+            self.logger.info(
+                f"Processing message from {topic}[{msg.partition()}] at offset {msg.offset()}"
+            )
+
             # Call the user's handler
-            self.logger.info(f"Processing message from {topic}")
             self._handle_message_callback(value, topic)
 
-            # Return success
-            return {"status": "success", "msg": msg}
+            # Commit the message
+            self.consumer.commit(msg)
+
+            self._update_health_status(
+                "OK",
+                last_message_processed_time=time(),
+                message_processing_count=self._health_status["message_processing_count"]
+                + 1,
+            )
+            self.logger.info(
+                f"Successfully processed and committed: {topic}[{msg.partition()}] at offset {msg.offset()}"
+            )
 
         except Exception as e:
             self.logger.error(f"Error processing message: {e}", exc_info=True)
-            # Return failure with the message and error
-            return {"status": "error", "msg": msg, "error": str(e)}
-
-    def _on_message_processed(self, future):
-        """Callback when message processing completes in manual mode"""
-        try:
-            # Get the result
-            result = future.result()
-            msg = result["msg"]
-
-            self.consumer.commit(msg)
-            if result["status"] == "success":
-                # Message processed successfully, commit the offset
-                self.logger.info(
-                    f"Successfully processed and committed: {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
-                )
-            else:
-                # Processing failed
-                error = result.get("error", "Unknown error")
+            self._update_health_status(
+                "WARNING",
+                last_error=str(e),
+                last_error_time=time(),
+                error_count=self._health_status["error_count"] + 1,
+            )
+            # In manual mode, we still commit the message even if processing failed
+            # to avoid getting stuck on a bad message
+            try:
+                self.consumer.commit(msg)
                 self.logger.warning(
-                    f"Failed message committed ({error}): {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
+                    f"Committed failed message: {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
                 )
-
-        except Exception as e:
-            self.logger.error(f"Error in message completion handling: {e}")
+            except Exception as commit_error:
+                self.logger.error(f"Error committing message: {commit_error}")
+                self._update_health_status(
+                    "ERROR",
+                    last_error=f"Commit error: {commit_error}",
+                    last_error_time=time(),
+                    error_count=self._health_status["error_count"] + 1,
+                )
 
         finally:
-            # Mark that we're done processing
+            # Resume the consumer and clear the processing flag
             with self._processing_lock:
-                self._currently_processing = False
-            # Resume the consumer
-            self.resume()
+                self._processing_flag = False
+                # Resume the consumer for all assigned partitions
+                self.resume()
 
-    def _handle_kafka_error(self, msg):
-        """Handle Kafka errors from poll"""
+    def _handle_kafka_error(self, msg) -> bool:
+        """
+        Handle Kafka errors from poll.
+        Returns True if the error was handled as a normal condition, False otherwise.
+        """
         error_code = msg.error().code()
         if error_code == KafkaError._PARTITION_EOF:
             # End of partition event - normal
             self.logger.debug(
                 f"Reached end of partition: {msg.topic()} [{msg.partition()}]"
             )
+            return True
         elif error_code == KafkaError._MAX_POLL_EXCEEDED:
             self.logger.error(
                 f"MAX_POLL_EXCEEDED error: {msg.error()}. "
                 "This indicates the consumer thread was blocked for too long. "
             )
+            # Update health status with max poll exceeded flag
+            self._update_health_status(
+                "ERROR",
+                max_poll_interval_exceeded=True,
+                last_error=f"MAX_POLL_EXCEEDED: {msg.error()}",
+                last_error_time=time(),
+                error_count=self._health_status["error_count"] + 1,
+            )
+            return False
         elif error_code == KafkaError.UNKNOWN_TOPIC_OR_PART:
             self.logger.error(
                 f"Kafka error: Topic or Partition unknown - {msg.error()}"
             )
+            return False
         else:
             self.logger.error(f"Kafka error: {msg.error()}")
+            return False
 
 
 # Example Usage

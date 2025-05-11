@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="osint-python-test-bed-adapter",
-    version="2.5.8",
+    version="2.6.0",
     license="MIT",
     author="TimovdK",
     author_email="timo_kuil@hotmail.com",
