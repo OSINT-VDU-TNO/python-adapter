@@ -1,10 +1,9 @@
+import os
 import logging
+import threading
 from threading import Thread, Event, Lock
 from time import sleep, time
-import threading
 from typing import Any, Dict, Literal, Tuple, Union
-import os
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 from confluent_kafka import DeserializingConsumer, KafkaError
 from confluent_kafka.schema_registry import SchemaRegistryClient
@@ -43,7 +42,7 @@ class ConsumerManager(Thread):
 
         # Processing configuration
         self.processing_mode = processing_mode
-        self.processing_timeout = options.processing_timeout
+        self.processing_timeout_ms = options.processing_timeout * 1000
         self.commit_on_timeout = True
 
         # Control flow events
@@ -198,6 +197,12 @@ class ConsumerManager(Thread):
             return 503, "ERROR", status_copy
         if status_copy["max_poll_interval_exceeded"]:
             return 503, "ERROR", status_copy
+        if (
+            status_copy["last_message_processed_time"] is not None
+            and time() - status_copy["last_message_processed_time"]
+            > self.processing_timeout_ms
+        ):
+            return 503, "ERROR", status_copy
         return 200, "OK", status_copy
 
     def run_auto_commit_mode(self):
@@ -347,52 +352,18 @@ class ConsumerManager(Thread):
                 f"Processing message from {topic}[{msg.partition()}] at offset {msg.offset()}"
             )
 
-            # Use ThreadPoolExecutor to enforce timeout
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self._handle_message_callback, value, topic)
-                try:
-                    future.result(timeout=self.processing_timeout)
-                    # Message processed successfully, commit it
-                    self.consumer.commit(msg)
-                    self._update_health_status(
-                        "OK",
-                        last_message_processed_time=time(),
-                        message_processing_count=self._health_status[
-                            "message_processing_count"
-                        ]
-                        + 1,
-                    )
-                    self.logger.info(
-                        f"Successfully processed and committed: {topic}[{msg.partition()}] at offset {msg.offset()}"
-                    )
-
-                except FuturesTimeoutError:
-                    self.logger.warning(
-                        f"Message processing timed out after {self.processing_timeout} seconds"
-                    )
-                    self._update_health_status(
-                        "WARNING",
-                        last_error="Message processing timeout",
-                        last_error_time=time(),
-                        timeout_count=self._health_status["timeout_count"] + 1,
-                    )
-
-                    if self.commit_on_timeout:
-                        try:
-                            self.consumer.commit(msg)
-                            self.logger.warning(
-                                f"Committed timed-out message: {topic}[{msg.partition()}] at offset {msg.offset()}"
-                            )
-                        except Exception as commit_error:
-                            self.logger.error(
-                                f"Error committing timed-out message: {commit_error}"
-                            )
-                            self._update_health_status(
-                                "ERROR",
-                                last_error=f"Commit error: {commit_error}",
-                                last_error_time=time(),
-                                error_count=self._health_status["error_count"] + 1,
-                            )
+            # Commit the message
+            self.consumer.commit(msg, asynchronous=True)
+            self._update_health_status(
+                "OK",
+                last_message_processed_time=time(),
+                message_processing_count=self._health_status["message_processing_count"]
+                + 1,
+            )
+            self._handle_message_callback(value, topic)
+            self.logger.info(
+                f"Successfully processed message from {topic}[{msg.partition()}] at offset {msg.offset()}"
+            )
 
         except Exception as e:
             self.logger.error(f"Error processing message: {e}", exc_info=True)
@@ -404,7 +375,6 @@ class ConsumerManager(Thread):
             )
             # In manual mode, commit the message even if processing failed
             try:
-                self.consumer.commit(msg)
                 self.logger.warning(
                     f"Committed failed message: {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
                 )
