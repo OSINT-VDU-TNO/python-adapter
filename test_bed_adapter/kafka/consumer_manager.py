@@ -3,13 +3,117 @@ import logging
 import threading
 from threading import Thread, Event, Lock
 from time import sleep, time
-from typing import Any, Dict, Literal, Tuple, Union
+from typing import Any, Dict, Literal, Tuple, Union, Optional
+from queue import Queue, Empty
 
 from confluent_kafka import DeserializingConsumer, KafkaError
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 
 from ..options.test_bed_options import TestBedOptions
+
+
+class MessageProcessor(Thread):
+    """Worker thread that processes messages from a queue."""
+
+    def __init__(self, process_callback, consumer_manager):
+        super().__init__()
+        self.daemon = True
+        self.logger = logging.getLogger(__name__)
+        self.process_callback = process_callback
+        self.consumer_manager = consumer_manager
+        self.queue = Queue()
+        self._stop_event = Event()
+        self.name = "MessageProcessorThread"
+
+    def run(self):
+        """Main thread execution loop that processes messages from the queue."""
+        self.logger.info(f"Message processor thread started")
+
+        while not self._stop_event.is_set():
+            try:
+                # Get the next message from the queue with a timeout
+                # This allows the thread to check the stop event periodically
+                try:
+                    msg = self.queue.get(timeout=1.0)
+                except Empty:
+                    continue
+
+                # Process the message
+                try:
+                    self.logger.info(
+                        f"Processing message from {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
+                    )
+
+                    # Process the message using the callback
+                    self.process_callback(msg.value(), msg.topic())
+
+                    self.logger.info(
+                        f"Successfully processed message from {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
+                    )
+
+                    # Update consumer health metrics
+                    self.consumer_manager._update_health_status(
+                        "OK",
+                        last_message_processed_time=time(),
+                        message_processing_count=self.consumer_manager._health_status[
+                            "message_processing_count"
+                        ]
+                        + 1,
+                    )
+
+                except Exception as e:
+                    self.logger.error(f"Error processing message: {e}", exc_info=True)
+                    self.consumer_manager._update_health_status(
+                        "WARNING",
+                        last_error=str(e),
+                        last_error_time=time(),
+                        error_count=self.consumer_manager._health_status["error_count"]
+                        + 1,
+                    )
+
+                finally:
+                    # In manual mode, commit the message even if processing failed
+                    try:
+                        self.consumer_manager.consumer.commit(msg, asynchronous=True)
+                        self.logger.debug(
+                            f"Committed message: {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
+                        )
+                    except Exception as commit_error:
+                        self.logger.error(f"Error committing message: {commit_error}")
+                        self.consumer_manager._update_health_status(
+                            "ERROR",
+                            last_error=f"Commit error: {commit_error}",
+                            last_error_time=time(),
+                            error_count=self.consumer_manager._health_status[
+                                "error_count"
+                            ]
+                            + 1,
+                        )
+
+                    # Signal that we're done with this message
+                    self.queue.task_done()
+
+                    # Resume the consumer after processing is complete
+                    with self.consumer_manager._processing_lock:
+                        self.consumer_manager._processing_flag = False
+                        self.consumer_manager.resume()
+
+            except Exception as e:
+                self.logger.error(
+                    f"Unexpected error in message processor: {e}", exc_info=True
+                )
+                # Sleep briefly to prevent CPU spinning in case of repeated errors
+                sleep(0.5)
+
+    def process_message(self, msg):
+        """Add a message to the processing queue."""
+        self.queue.put(msg)
+
+    def stop(self):
+        """Signal the processor to stop."""
+        self._stop_event.set()
+        self.logger.info("Message processor stopping")
 
 
 class ConsumerManager(Thread):
@@ -66,6 +170,14 @@ class ConsumerManager(Thread):
             "max_poll_interval_exceeded": False,
             "current_assigned_partitions": 0,
         }
+
+        # Create message processor thread for manual commit mode
+        self.message_processor = None
+        if processing_mode == "manual_commit":
+            self.message_processor = MessageProcessor(
+                self._handle_message_callback, self
+            )
+            self.message_processor.start()
 
         # --- Schema Registry and Deserializer Setup ---
         try:
@@ -152,6 +264,11 @@ class ConsumerManager(Thread):
         self.logger.info(f"Stopping consumer for {self.kafka_topic}")
         self._stop_event.set()
         self.running = False
+
+        # Stop the message processor if it exists
+        if self.message_processor:
+            self.message_processor.stop()
+
         self._update_health_status("STOPPING")
 
     def pause(self):
@@ -280,7 +397,7 @@ class ConsumerManager(Thread):
                     sleep(1.0)
 
     def run_manual_commit_mode(self):
-        """Run in manual-commit mode - process one message at a time with explicit commits"""
+        """Run in manual-commit mode - process one message at a time using the persistent worker thread"""
         self.logger.info(f"Starting manual-commit consumer for {self.kafka_topic}")
 
         while not self._stop_event.is_set() and self.running:
@@ -321,13 +438,10 @@ class ConsumerManager(Thread):
                 # Got a valid message - process it
                 with self._processing_lock:
                     self._processing_flag = True
-                    self.pause()
+                    self.pause()  # Pause the consumer while processing
 
-                # Process the message in a separate thread
-                processing_thread = threading.Thread(
-                    target=self._process_message_in_thread, args=(msg,), daemon=True
-                )
-                processing_thread.start()
+                # Instead of creating a new thread, send it to our persistent worker
+                self.message_processor.process_message(msg)
 
             except Exception as e:
                 self.logger.error(
@@ -341,57 +455,6 @@ class ConsumerManager(Thread):
                 )
                 if self.running:
                     sleep(1.0)
-
-    def _process_message_in_thread(self, msg):
-        """Process a message in a separate thread and handle resuming the consumer"""
-        try:
-            value = msg.value()
-            topic = msg.topic()
-
-            self.logger.info(
-                f"Processing message from {topic}[{msg.partition()}] at offset {msg.offset()}"
-            )
-
-            # Commit the message
-            self.consumer.commit(msg, asynchronous=True)
-            self._update_health_status(
-                "OK",
-                last_message_processed_time=time(),
-                message_processing_count=self._health_status["message_processing_count"]
-                + 1,
-            )
-            self._handle_message_callback(value, topic)
-            self.logger.info(
-                f"Successfully processed message from {topic}[{msg.partition()}] at offset {msg.offset()}"
-            )
-
-        except Exception as e:
-            self.logger.error(f"Error processing message: {e}", exc_info=True)
-            self._update_health_status(
-                "WARNING",
-                last_error=str(e),
-                last_error_time=time(),
-                error_count=self._health_status["error_count"] + 1,
-            )
-            # In manual mode, commit the message even if processing failed
-            try:
-                self.logger.warning(
-                    f"Committed failed message: {msg.topic()}[{msg.partition()}] at offset {msg.offset()}"
-                )
-            except Exception as commit_error:
-                self.logger.error(f"Error committing message: {commit_error}")
-                self._update_health_status(
-                    "ERROR",
-                    last_error=f"Commit error: {commit_error}",
-                    last_error_time=time(),
-                    error_count=self._health_status["error_count"] + 1,
-                )
-
-        finally:
-            # Resume the consumer and clear the processing flag
-            with self._processing_lock:
-                self._processing_flag = False
-                self.resume()
 
     def _handle_kafka_error(self, msg) -> bool:
         """
