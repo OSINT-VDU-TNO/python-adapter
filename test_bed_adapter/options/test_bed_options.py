@@ -9,7 +9,7 @@ class TestBedOptions:
     Configuration options for the TestBed Adapter.
 
     Attributes:
-        consumer_group (str | None): Group ID that this adapter should join.
+        group_id or consumer_group (str | None): Group ID that this adapter should join.
         kafka_host (str | None): Uri for the Kafka broker, e.g. broker:3501. Required.
         schema_registry (str): Uri for the schema registry, e.g. schema_registry:3502.
         message_max_bytes (int): Maximum size for a single Kafka message in bytes.
@@ -24,6 +24,7 @@ class TestBedOptions:
         ignore_timeout (bool | None): Ignore messages that for timeout (Unclear purpose - add doc).
         use_latest (bool): If true, use the latest message (Unclear purpose - add doc).
         heartbeat_interval (int): Interval between two heartbeat messages in seconds. Set to 0 or negative to disable.
+        self.processing_timeout (int): Default 300 seconds, after which processing is cancelled
         # Add type hints and docstrings for other options as needed
         # use_ssl (bool): If set true, use SSL.
         # ca_file (str): Path to trusted CA certificate.
@@ -37,6 +38,7 @@ class TestBedOptions:
     def __init__(self, dictionary: dict):
         # Initialize with default values and type hints
         self.consumer_group: Optional[str] = None
+        self.group_id: Optional[str] = None
         self.kafka_host: str = (
             "localhost:3501"  # Mark as Optional as it's checked in validate_options
         )
@@ -48,9 +50,10 @@ class TestBedOptions:
         self.max_poll_interval_ms: int = 300000
         self.session_timeout_ms: int = 90000
         self.offset_type: str = "latest"
-        self.heartbeat_interval: int = (
-            0  # Default is 0 seconds, equivalent to no heartbeat
-        )
+        # Default is 0 seconds, equivalent to no heartbeat
+        self.heartbeat_interval: int = 0
+        # Default 30 seconds, after which processing is cancelled
+        self.processing_timeout: int = 300
 
         # Override default values with values from the dictionary
         for key, value in dictionary.items():  # Use .items() for clarity

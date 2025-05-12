@@ -3,6 +3,8 @@ from threading import Thread, Event, Lock
 from time import sleep, time
 import threading
 from typing import Any, Dict, Literal, Tuple, Union
+import os
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 from confluent_kafka import DeserializingConsumer, KafkaError
 from confluent_kafka.schema_registry import SchemaRegistryClient
@@ -41,6 +43,8 @@ class ConsumerManager(Thread):
 
         # Processing configuration
         self.processing_mode = processing_mode
+        self.processing_timeout = options.processing_timeout
+        self.commit_on_timeout = True
 
         # Control flow events
         self._stop_event = Event()
@@ -53,8 +57,11 @@ class ConsumerManager(Thread):
         self._health_lock = Lock()
         self._health_status = {
             "status": "INITIALIZING",
+            "last_message_processed_time": None,
+            "last_poll_time": time(),
             "message_processing_count": 0,
             "error_count": 0,
+            "timeout_count": 0,
             "last_error": None,
             "last_error_time": None,
             "max_poll_interval_exceeded": False,
@@ -126,7 +133,7 @@ class ConsumerManager(Thread):
             self.logger.error("Consumer failed to initialize. Exiting run.")
             return
 
-        self._update_health_status("RUNNING")
+        self._update_health_status("OK")
 
         # Start processing based on mode
         if self.processing_mode == "auto_commit":
@@ -162,7 +169,7 @@ class ConsumerManager(Thread):
         if assigned_partitions:
             self.consumer.resume(assigned_partitions)
             self.logger.debug(f"Resumed consumer for {assigned_partitions}")
-            self._update_health_status("RUNNING")
+            self._update_health_status("OK")
 
     def _update_health_status(self, status, **kwargs):
         """Update the health status with new information"""
@@ -191,7 +198,6 @@ class ConsumerManager(Thread):
             return 503, "ERROR", status_copy
         if status_copy["max_poll_interval_exceeded"]:
             return 503, "ERROR", status_copy
-        # All checks passed, consumer is healthy
         return 200, "OK", status_copy
 
     def run_auto_commit_mode(self):
@@ -200,6 +206,7 @@ class ConsumerManager(Thread):
 
         while not self._stop_event.is_set() and self.running:
             try:
+                self._update_health_status("OK", last_poll_time=time())
                 # Poll for messages
                 msg = self.consumer.poll(timeout=1.0)
 
@@ -207,6 +214,7 @@ class ConsumerManager(Thread):
                 assigned_partitions = self.consumer.assignment()
                 self._update_health_status(
                     "OK",
+                    last_message_processed_time=time(),
                     current_assigned_partitions=(
                         len(assigned_partitions) if assigned_partitions else 0
                     ),
@@ -218,7 +226,6 @@ class ConsumerManager(Thread):
                 if msg.error():
                     error_handled = self._handle_kafka_error(msg)
                     if not error_handled:
-                        # If error was not handled as a normal condition, update health status
                         self._update_health_status(
                             "WARNING",
                             last_error=f"Kafka error: {msg.error()}",
@@ -235,6 +242,7 @@ class ConsumerManager(Thread):
                     self._handle_message_callback(msg.value(), msg.topic())
                     self._update_health_status(
                         "OK",
+                        last_message_processed_time=time(),
                         message_processing_count=self._health_status[
                             "message_processing_count"
                         ]
@@ -245,7 +253,6 @@ class ConsumerManager(Thread):
                     )
                 except Exception as e:
                     # In auto-commit mode, we log the error but continue processing
-                    # The failed message will be auto-committed
                     self.logger.error(f"Error processing message: {e}", exc_info=True)
                     self._update_health_status(
                         "WARNING",
@@ -265,7 +272,6 @@ class ConsumerManager(Thread):
                     error_count=self._health_status["error_count"] + 1,
                 )
                 if self.running:
-                    # Small delay to prevent tight error loops
                     sleep(1.0)
 
     def run_manual_commit_mode(self):
@@ -278,8 +284,6 @@ class ConsumerManager(Thread):
                 # Check if we're still processing a message
                 with self._processing_lock:
                     if self._processing_flag:
-                        # Continue polling with a short timeout to maintain consumer heartbeat
-                        # but don't fetch or process messages
                         self.consumer.poll(timeout=0.1)
                         sleep(0.1)
                         continue
@@ -301,7 +305,6 @@ class ConsumerManager(Thread):
                 if msg.error():
                     error_handled = self._handle_kafka_error(msg)
                     if not error_handled:
-                        # If error was not handled as a normal condition, update health status
                         self._update_health_status(
                             "WARNING",
                             last_error=f"Kafka error: {msg.error()}",
@@ -312,9 +315,7 @@ class ConsumerManager(Thread):
 
                 # Got a valid message - process it
                 with self._processing_lock:
-                    # Mark that we're processing a message
                     self._processing_flag = True
-                    # Pause the consumer for all assigned partitions
                     self.pause()
 
                 # Process the message in a separate thread
@@ -334,7 +335,6 @@ class ConsumerManager(Thread):
                     error_count=self._health_status["error_count"] + 1,
                 )
                 if self.running:
-                    # Small delay to prevent tight error loops
                     sleep(1.0)
 
     def _process_message_in_thread(self, msg):
@@ -347,21 +347,52 @@ class ConsumerManager(Thread):
                 f"Processing message from {topic}[{msg.partition()}] at offset {msg.offset()}"
             )
 
-            # Call the user's handler
-            self._handle_message_callback(value, topic)
+            # Use ThreadPoolExecutor to enforce timeout
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(self._handle_message_callback, value, topic)
+                try:
+                    future.result(timeout=self.processing_timeout)
+                    # Message processed successfully, commit it
+                    self.consumer.commit(msg)
+                    self._update_health_status(
+                        "OK",
+                        last_message_processed_time=time(),
+                        message_processing_count=self._health_status[
+                            "message_processing_count"
+                        ]
+                        + 1,
+                    )
+                    self.logger.info(
+                        f"Successfully processed and committed: {topic}[{msg.partition()}] at offset {msg.offset()}"
+                    )
 
-            # Commit the message
-            self.consumer.commit(msg)
+                except FuturesTimeoutError:
+                    self.logger.warning(
+                        f"Message processing timed out after {self.processing_timeout} seconds"
+                    )
+                    self._update_health_status(
+                        "WARNING",
+                        last_error="Message processing timeout",
+                        last_error_time=time(),
+                        timeout_count=self._health_status["timeout_count"] + 1,
+                    )
 
-            self._update_health_status(
-                "OK",
-                last_message_processed_time=time(),
-                message_processing_count=self._health_status["message_processing_count"]
-                + 1,
-            )
-            self.logger.info(
-                f"Successfully processed and committed: {topic}[{msg.partition()}] at offset {msg.offset()}"
-            )
+                    if self.commit_on_timeout:
+                        try:
+                            self.consumer.commit(msg)
+                            self.logger.warning(
+                                f"Committed timed-out message: {topic}[{msg.partition()}] at offset {msg.offset()}"
+                            )
+                        except Exception as commit_error:
+                            self.logger.error(
+                                f"Error committing timed-out message: {commit_error}"
+                            )
+                            self._update_health_status(
+                                "ERROR",
+                                last_error=f"Commit error: {commit_error}",
+                                last_error_time=time(),
+                                error_count=self._health_status["error_count"] + 1,
+                            )
 
         except Exception as e:
             self.logger.error(f"Error processing message: {e}", exc_info=True)
@@ -371,8 +402,7 @@ class ConsumerManager(Thread):
                 last_error_time=time(),
                 error_count=self._health_status["error_count"] + 1,
             )
-            # In manual mode, we still commit the message even if processing failed
-            # to avoid getting stuck on a bad message
+            # In manual mode, commit the message even if processing failed
             try:
                 self.consumer.commit(msg)
                 self.logger.warning(
@@ -391,7 +421,6 @@ class ConsumerManager(Thread):
             # Resume the consumer and clear the processing flag
             with self._processing_lock:
                 self._processing_flag = False
-                # Resume the consumer for all assigned partitions
                 self.resume()
 
     def _handle_kafka_error(self, msg) -> bool:
@@ -401,7 +430,6 @@ class ConsumerManager(Thread):
         """
         error_code = msg.error().code()
         if error_code == KafkaError._PARTITION_EOF:
-            # End of partition event - normal
             self.logger.debug(
                 f"Reached end of partition: {msg.topic()} [{msg.partition()}]"
             )
@@ -411,7 +439,6 @@ class ConsumerManager(Thread):
                 f"MAX_POLL_EXCEEDED error: {msg.error()}. "
                 "This indicates the consumer thread was blocked for too long. "
             )
-            # Update health status with max poll exceeded flag
             self._update_health_status(
                 "ERROR",
                 max_poll_interval_exceeded=True,
@@ -451,15 +478,15 @@ if __name__ == "__main__":
         consumer_group="my_avro_consumer",
         max_poll_interval_ms=300000,  # 5 minutes
         session_timeout_ms=45000,  # 45 seconds
-        offset_type="earliest",  # Start from earliest available message if no committed offset
+        offset_type="earliest",
     )
 
     kafka_topic = "your_avro_topic"
+    processing_mode = "manual_commit"
 
-    # Choose the appropriate mode:
-    # For lightweight processing: "auto_commit"
-    # For resource-intensive processing: "manual_commit"
-    processing_mode = "manual_commit"  # or "auto_commit"
+    # Set environment variables for timeout
+    os.environ["PROCESSING_TIMEOUT_SECONDS"] = "3"  # Set to 3 seconds for testing
+    os.environ["COMMIT_ON_TIMEOUT"] = "true"  # Commit timed-out messages
 
     # Create and start the consumer
     consumer = ConsumerManager(
@@ -469,22 +496,19 @@ if __name__ == "__main__":
         processing_mode=processing_mode,
     )
 
-    if consumer.running:  # Check if initialization was successful
+    if consumer.running:
         try:
-            consumer.start()  # Start the consumer thread
+            consumer.start()
             print(
                 f"Consumer thread started in {processing_mode} mode. Press Ctrl+C to stop."
             )
-
-            # Keep the main thread alive
             while consumer.is_alive():
                 sleep(1)
-
         except KeyboardInterrupt:
             print("\nCtrl+C detected. Stopping consumer...")
         finally:
-            consumer.stop()  # Signal the consumer thread to stop
-            consumer.join(timeout=30)  # Wait for the consumer thread to finish
+            consumer.stop()
+            consumer.join(timeout=30)
             print("Consumer thread stopped.")
     else:
         print("Consumer failed to initialize.")
