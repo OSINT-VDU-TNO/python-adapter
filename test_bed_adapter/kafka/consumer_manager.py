@@ -328,7 +328,6 @@ class ConsumerManager(Thread):
 
         while not self._stop_event.is_set() and self.running:
             try:
-                self._update_health_status("OK", last_poll_time=time())
                 # Poll for messages
                 msg = self.consumer.poll(timeout=1.0)
 
@@ -337,6 +336,7 @@ class ConsumerManager(Thread):
                 self._update_health_status(
                     "OK",
                     last_message_processed_time=time(),
+                    last_poll_time=time(),
                     current_assigned_partitions=(
                         len(assigned_partitions) if assigned_partitions else 0
                     ),
