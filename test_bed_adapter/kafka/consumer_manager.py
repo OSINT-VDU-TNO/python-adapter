@@ -273,6 +273,8 @@ class ConsumerManager(Thread):
 
     def pause(self):
         """Pause consuming messages"""
+        if self.consumer is None:
+            return
         assigned_partitions = self.consumer.assignment()
         if assigned_partitions:
             self.consumer.pause(assigned_partitions)
@@ -281,6 +283,8 @@ class ConsumerManager(Thread):
 
     def resume(self):
         """Resume consuming messages"""
+        if self.consumer is None:
+            return
         assigned_partitions = self.consumer.assignment()
         if assigned_partitions:
             self.consumer.resume(assigned_partitions)
@@ -326,10 +330,14 @@ class ConsumerManager(Thread):
         """Run in auto-commit mode - process messages in batches with auto-commit"""
         self.logger.info(f"Starting auto-commit consumer for {self.kafka_topic}")
 
+        if self.consumer is None:
+            self.logger.warning("Consumer not initialized, skipping auto-commit mode")
+            raise ValueError("Consumer not initialized")
+
         while not self._stop_event.is_set() and self.running:
             try:
                 # Poll for messages
-                msg = self.consumer.poll(timeout=1.0)
+                msg = self.consumer.poll(timeout=1)
 
                 # Update partition count
                 assigned_partitions = self.consumer.assignment()
@@ -400,18 +408,28 @@ class ConsumerManager(Thread):
         """Run in manual-commit mode - process one message at a time using the persistent worker thread"""
         self.logger.info(f"Starting manual-commit consumer for {self.kafka_topic}")
 
+        if self.consumer is None:
+            self.logger.warning("Consumer not initialized, skipping manual-commit mode")
+            raise ValueError("Consumer not initialized")
+
+        if self.message_processor is None:
+            self.logger.warning(
+                "Message processor not initialized, skipping manual-commit mode"
+            )
+            raise ValueError("Message processor not initialized")
+
         while not self._stop_event.is_set() and self.running:
             try:
                 self._update_health_status("OK", last_poll_time=time())
                 # Check if we're still processing a message
                 with self._processing_lock:
                     if self._processing_flag:
-                        self.consumer.poll(timeout=0.1)
+                        self.consumer.poll(timeout=1)
                         sleep(0.1)
                         continue
 
                 # Poll for a new message
-                msg = self.consumer.poll(timeout=1.0)
+                msg = self.consumer.poll(timeout=1)
 
                 assigned_partitions = self.consumer.assignment()
                 self._update_health_status(
@@ -506,13 +524,13 @@ if __name__ == "__main__":
 
     # Create options
     options = TestBedOptions(
-        kafka_host="localhost:9092",
-        schema_registry="localhost:8081",
-        consumer_group="my_avro_consumer",
-        max_poll_interval_ms=300000,  # 5 minutes
-        session_timeout_ms=45000,  # 45 seconds
-        offset_type="earliest",
-    )
+        kafka_host="localhost:9092",  # type: ignore
+        schema_registry="localhost:8081",  # type: ignore
+        consumer_group="my_avro_consumer",  # type: ignore
+        max_poll_interval_ms=300000,  # 5 minutes # type: ignore
+        session_timeout_ms=45000,  # 45 seconds # type: ignore
+        offset_type="earliest",  # type: ignore
+    )  # type: ignore
 
     kafka_topic = "your_avro_topic"
     processing_mode = "manual_commit"

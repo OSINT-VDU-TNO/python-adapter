@@ -47,30 +47,38 @@ class ProducerManager:
             )
             self.avro_message_serializer = None
             self.avro_key_serializer = None
-            self.schema_str = None
+            self.schema_str = ""
             return  # Exit __init__ early
 
         try:
             # Use the stored schema_registry_client instance for serializers
             value_schema = self.schema_registry_client.get_latest_version(
                 f"{kafka_topic}-value"
-            ).schema.schema_str
+            ).schema
+            if value_schema is not None:
+                value_schema_str = value_schema.schema_str or ""
+            else:
+                value_schema_str = ""
+
             avro_message_serializer = AvroSerializer(
                 schema_registry_client=self.schema_registry_client,  # Use self.client
-                schema_str=value_schema,
+                schema_str=value_schema_str,
             )
 
             key_schema = self.schema_registry_client.get_latest_version(
                 f"{kafka_topic}-key"
-            ).schema.schema_str
+            ).schema
+            if key_schema is not None:
+                key_schema_str = key_schema.schema_str
+
             avro_key_serializer = AvroSerializer(
                 schema_registry_client=self.schema_registry_client,  # Use self.client
-                schema_str=key_schema,
+                schema_str=key_schema_str,
             )
 
             # Keep schema_str if needed elsewhere, otherwise this could be removed
             # self.schema = self.schema_registry_client.get_latest_version(kafka_topic + "-value") # Redundant unless self.schema is used
-            self.schema_str: str = value_schema  # Store the schema string if needed
+            self.schema_str: str = value_schema_str  # Store the schema string if needed
 
             producer_conf = {
                 "bootstrap.servers": self.options.kafka_host,
@@ -100,7 +108,7 @@ class ProducerManager:
             # Clean up serializers if they were created before the error
             self.avro_message_serializer = None
             self.avro_key_serializer = None
-            self.schema_str = None
+            self.schema_str = ""
             # The schema_registry_client instance still exists but might be unusable depending on the error
             # Depending on requirements, you might want to raise the exception
             # raise
